@@ -10,4 +10,11 @@ const config: Config = {
   testMatch: ['<rootDir>/tests/**/*.test.ts', '<rootDir>/tests/**/*.test.tsx'],
 }
 
-export default createJestConfig(config)
+// nextJest prepends /node_modules/ to transformIgnorePatterns, blocking ESM packages
+// like jose. We wrap the config factory to override that pattern so jose is transformed.
+const jestConfig = createJestConfig(config)
+export default async () => {
+  const cfg = await jestConfig()
+  cfg.transformIgnorePatterns = ['/node_modules/(?!(jose)/)']
+  return cfg
+}
