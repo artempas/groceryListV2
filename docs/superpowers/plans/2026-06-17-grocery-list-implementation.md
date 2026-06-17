@@ -6,7 +6,7 @@
 
 **Architecture:** Next.js 14 App Router monorepo — API Routes serve the backend, React Server/Client Components serve the frontend. PostgreSQL + pgvector via Prisma ORM. JWT auth stored in httpOnly cookies. TanStack Query for client-side data fetching and optimistic updates.
 
-**Tech Stack:** Next.js 14, TypeScript 5 (strict), Prisma 5, PostgreSQL 16 + pgvector, jose 5 (JWT), bcryptjs 2, TanStack Query v5, Tailwind CSS 3, @ducanh2912/next-pwa, Jest 29, next-test-api-route-handler 4, Docker Compose, Nginx
+**Tech Stack:** Next.js 14, TypeScript 5 (strict), Prisma 5, PostgreSQL 16 + pgvector, jose 5 (JWT), bcryptjs 2, TanStack Query v5, Tailwind CSS 3, Jest 29, next-test-api-route-handler 4, Docker Compose, Nginx. PWA: manual service worker + manifest (no external PWA library).
 
 ## Global Constraints
 
@@ -133,8 +133,7 @@ npm install \
   @prisma/client \
   bcryptjs \
   jose \
-  @tanstack/react-query \
-  @ducanh2912/next-pwa
+  @tanstack/react-query
 
 npm install -D \
   prisma \
@@ -2273,36 +2272,16 @@ git commit -m "feat: list detail page with items, toggle, swipe-delete"
 ### Task 12: PWA Configuration
 
 **Files:**
-- Modify: `next.config.ts`
 - Create: `public/manifest.json`
+- Create: `public/sw.js`
 - Create: `public/icons/icon-192.png` (placeholder)
 - Create: `public/icons/icon-512.png` (placeholder)
+- Modify: `app/layout.tsx` — add SW registration script
 
 **Interfaces:**
-- Produces: app installable as PWA on Android/iOS; offline static assets cached by service worker
+- Produces: app installable as PWA on Android/iOS; offline static assets cached by service worker (no external PWA library — manual `sw.js` + `manifest.json`)
 
-- [ ] **Step 1: Update `next.config.ts` with next-pwa**
-
-```typescript
-import type { NextConfig } from 'next'
-import withPWAInit from '@ducanh2912/next-pwa'
-
-const withPWA = withPWAInit({
-  dest: 'public',
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: true,
-  disable: process.env.NODE_ENV === 'development',
-})
-
-const nextConfig: NextConfig = {
-  // add any other Next.js config here
-}
-
-export default withPWA(nextConfig)
-```
-
-- [ ] **Step 2: Write `public/manifest.json`**
+- [ ] **Step 1: Write `public/manifest.json`**
 
 ```json
 {
@@ -2331,9 +2310,63 @@ export default withPWA(nextConfig)
 }
 ```
 
-- [ ] **Step 3: Generate placeholder icons**
+- [ ] **Step 2: Write `public/sw.js`**
 
-Create minimal 192×192 and 512×512 PNG placeholder icons. You can use any image editor, or generate them programmatically:
+A minimal service worker: caches Next.js static assets, skips API routes.
+
+```javascript
+const CACHE_NAME = 'grocery-v1'
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
+  )
+  self.clients.claim()
+})
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return
+  if (event.request.url.includes('/api/')) return
+
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached
+      return fetch(event.request).then((response) => {
+        if (response.ok && event.request.url.includes('/_next/static/')) {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+        }
+        return response
+      })
+    })
+  )
+})
+```
+
+- [ ] **Step 3: Register service worker in `app/layout.tsx`**
+
+Add `next/script` import and a registration script to the existing root layout. The layout already has PWA meta tags from Task 1 — add `Script` inside `<body>`:
+
+```typescript
+import Script from 'next/script'
+
+// Inside RootLayout, in <body> before {children}:
+<Script
+  id="sw-register"
+  strategy="afterInteractive"
+  dangerouslySetInnerHTML={{
+    __html: `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js') }`,
+  }}
+/>
+```
+
+- [ ] **Step 4: Generate placeholder icons**
 
 ```bash
 # Requires ImageMagick
@@ -2348,25 +2381,21 @@ convert -size 512x512 xc:'#000000' \
   public/icons/icon-512.png
 ```
 
-If ImageMagick is unavailable, copy any 192×192 and 512×512 PNG files into `public/icons/` named `icon-192.png` and `icon-512.png`.
+If ImageMagick is unavailable, create two PNG files of the correct sizes using any tool and place them at `public/icons/icon-192.png` and `public/icons/icon-512.png`.
 
-- [ ] **Step 4: Build production and verify manifest**
+- [ ] **Step 5: Build production and verify manifest**
 
 ```bash
 npm run build && npm start
 ```
 
-Open http://localhost:3000 in Chrome DevTools → Application → Manifest. Verify icons and display mode show correctly.
-
-- [ ] **Step 5: Test PWA install on mobile**
-
-Open the app on an Android/iOS device or Chrome DevTools mobile emulation. Confirm "Add to Home Screen" prompt appears.
+Open http://localhost:3000 in Chrome DevTools → Application → Manifest. Verify icons and display mode show correctly. Check Application → Service Workers to confirm `sw.js` is registered.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add next.config.ts public/manifest.json public/icons/
-git commit -m "feat: PWA configuration (manifest, service worker, icons)"
+git add public/manifest.json public/sw.js public/icons/ app/layout.tsx
+git commit -m "feat: PWA — manual service worker, manifest, icons"
 ```
 
 ---
