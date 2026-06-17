@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime   @default(now())
+
+  lists        List[]
+  createdItems ListItem[] @relation("ItemCreatedBy")
+  checkedItems ListItem[] @relation("ItemCheckedBy")
+}
+
+model List {
+  id        String     @id @default(cuid())
+  name      String
+  owner     User       @relation(fields: [ownerId], references: [id])
+  ownerId   String
+  createdAt DateTime   @default(now())
+
+  items     ListItem[]
+}
+
+model ListItem {
+  id          String    @id @default(cuid())
+  name        String
+  list        List      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId      String
+  createdBy   User      @relation("ItemCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime  @default(now())
+  checkedAt   DateTime?
+  checkedBy   User?     @relation("ItemCheckedBy", fields: [checkedById], references: [id])
+  checkedById String?
+}
