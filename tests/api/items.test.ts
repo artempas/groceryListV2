@@ -1,0 +1,140 @@
+import { testApiHandler } from 'next-test-api-route-handler'
+import * as itemsHandler from '@/app/api/lists/[id]/items/route'
+import * as itemHandler from '@/app/api/lists/[id]/items/[itemId]/route'
+
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    list: { findUnique: jest.fn() },
+    listItem: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+  },
+}))
+
+jest.mock('@/lib/auth', () => ({
+  ...jest.requireActual('@/lib/auth'),
+  getSession: jest.fn(),
+}))
+
+import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/auth'
+const mockGetSession = getSession as jest.Mock
+const mockList = prisma.list as jest.Mocked<typeof prisma.list>
+const mockItem = prisma.listItem as jest.Mocked<typeof prisma.listItem>
+
+const session = { userId: 'user-1', email: 'a@b.com' }
+const list = { id: 'list-1', name: 'G', ownerId: 'user-1', createdAt: new Date() }
+const item = {
+  id: 'item-1', name: 'Milk', listId: 'list-1',
+  createdById: 'user-1', createdAt: new Date(),
+  checkedAt: null, checkedById: null,
+}
+
+beforeEach(() => {
+  process.env.JWT_SECRET = 'test-secret-that-is-at-least-32-chars!!'
+  jest.clearAllMocks()
+  mockGetSession.mockResolvedValue(session)
+  mockList.findUnique.mockResolvedValue(list)
+})
+
+describe('GET /api/lists/:id/items', () => {
+  it('returns items', async () => {
+    mockItem.findMany.mockResolvedValue([item])
+
+    await testApiHandler({
+      appHandler: itemsHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        const res = await fetch({ method: 'GET' })
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        expect(body.data).toHaveLength(1)
+        expect(body.data[0].name).toBe('Milk')
+      },
+    })
+  })
+})
+
+describe('POST /api/lists/:id/items', () => {
+  it('creates an item', async () => {
+    mockItem.create.mockResolvedValue(item)
+
+    await testApiHandler({
+      appHandler: itemsHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        const res = await fetch({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Milk' }),
+        })
+        expect(res.status).toBe(201)
+        const body = await res.json()
+        expect(body.data.name).toBe('Milk')
+      },
+    })
+  })
+})
+
+describe('PATCH /api/lists/:id/items/:itemId — toggle check', () => {
+  it('sets checkedAt and checkedById when checked=true', async () => {
+    const checkedItem = { ...item, checkedAt: new Date(), checkedById: 'user-1' }
+    mockItem.findUnique.mockResolvedValue(item)
+    mockItem.update.mockResolvedValue(checkedItem)
+
+    await testApiHandler({
+      appHandler: itemHandler,
+      params: { id: 'list-1', itemId: 'item-1' },
+      async test({ fetch }) {
+        const res = await fetch({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ checked: true }),
+        })
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        expect(body.data.checkedById).toBe('user-1')
+      },
+    })
+  })
+
+  it('clears checkedAt and checkedById when checked=false', async () => {
+    mockItem.findUnique.mockResolvedValue({ ...item, checkedAt: new Date(), checkedById: 'user-1' })
+    mockItem.update.mockResolvedValue(item)
+
+    await testApiHandler({
+      appHandler: itemHandler,
+      params: { id: 'list-1', itemId: 'item-1' },
+      async test({ fetch }) {
+        const res = await fetch({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ checked: false }),
+        })
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        expect(body.data.checkedById).toBeNull()
+      },
+    })
+  })
+})
+
+describe('DELETE /api/lists/:id/items/:itemId', () => {
+  it('deletes an item', async () => {
+    mockItem.findUnique.mockResolvedValue(item)
+    mockItem.delete.mockResolvedValue(item)
+
+    await testApiHandler({
+      appHandler: itemHandler,
+      params: { id: 'list-1', itemId: 'item-1' },
+      async test({ fetch }) {
+        const res = await fetch({ method: 'DELETE' })
+        expect(res.status).toBe(200)
+      },
+    })
+  })
+})
