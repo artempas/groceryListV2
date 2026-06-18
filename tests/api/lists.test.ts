@@ -11,6 +11,7 @@ jest.mock('@/lib/prisma', () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
+    listMembership: { findUnique: jest.fn() },
   },
 }))
 

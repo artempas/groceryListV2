@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
-
-async function requireListAccess(userId: string, listId: string) {
-  const list = await prisma.list.findUnique({ where: { id: listId } })
-  if (!list) return { error: 'Not found', status: 404 }
-  if (list.ownerId !== userId) return { error: 'Forbidden', status: 403 }
-  return { list }
-}
+import { requireListAccess } from '@/lib/access'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()

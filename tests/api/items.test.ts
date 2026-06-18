@@ -12,6 +12,7 @@ jest.mock('@/lib/prisma', () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
+    listMembership: { findUnique: jest.fn() },
   },
 }))
 
@@ -134,6 +135,45 @@ describe('DELETE /api/lists/:id/items/:itemId', () => {
       async test({ fetch }) {
         const res = await fetch({ method: 'DELETE' })
         expect(res.status).toBe(200)
+      },
+    })
+  })
+})
+
+describe('GET /api/lists/:id/items as member', () => {
+  it('member can list items in shared list', async () => {
+    mockGetSession.mockResolvedValue({ userId: 'member-1', email: 'm@x.com' })
+    ;(prisma.list.findUnique as jest.Mock).mockResolvedValue({
+      id: 'list-1', name: 'L', ownerId: 'owner-1', createdAt: new Date(),
+    })
+    ;(prisma.listMembership.findUnique as jest.Mock).mockResolvedValue({
+      listId: 'list-1', userId: 'member-1', joinedAt: new Date(),
+    })
+    ;(prisma.listItem.findMany as jest.Mock).mockResolvedValue([])
+
+    await testApiHandler({
+      appHandler: itemsHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        const res = await fetch({ method: 'GET' })
+        expect(res.status).toBe(200)
+      },
+    })
+  })
+
+  it('non-member gets 403', async () => {
+    mockGetSession.mockResolvedValue({ userId: 'stranger', email: 's@x.com' })
+    ;(prisma.list.findUnique as jest.Mock).mockResolvedValue({
+      id: 'list-1', name: 'L', ownerId: 'owner-1', createdAt: new Date(),
+    })
+    ;(prisma.listMembership.findUnique as jest.Mock).mockResolvedValue(null)
+
+    await testApiHandler({
+      appHandler: itemsHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        const res = await fetch({ method: 'GET' })
+        expect(res.status).toBe(403)
       },
     })
   })

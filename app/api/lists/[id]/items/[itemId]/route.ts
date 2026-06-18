@@ -1,26 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { requireListAccess } from '@/lib/access'
 
-async function requireItemAccess(userId: string, listId: string, itemId: string) {
-  const list = await prisma.list.findUnique({ where: { id: listId } })
-  if (!list) return { error: 'Not found', status: 404 }
-  if (list.ownerId !== userId) return { error: 'Forbidden', status: 403 }
-
+async function findItem(listId: string, itemId: string) {
   const item = await prisma.listItem.findUnique({ where: { id: itemId } })
-  if (!item || item.listId !== listId) return { error: 'Not found', status: 404 }
-  return { item }
+  if (!item || item.listId !== listId) return null
+  return item
 }
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; itemId: string } }
+  { params }: { params: { id: string; itemId: string } },
 ) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const check = await requireItemAccess(session.userId, params.id, params.itemId)
+  const check = await requireListAccess(session.userId, params.id)
   if ('error' in check) return NextResponse.json({ error: check.error }, { status: check.status })
+
+  const item = await findItem(params.id, params.itemId)
+  if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { checked } = await request.json()
 
@@ -40,13 +40,16 @@ export async function PATCH(
 
 export async function DELETE(
   _: NextRequest,
-  { params }: { params: { id: string; itemId: string } }
+  { params }: { params: { id: string; itemId: string } },
 ) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const check = await requireItemAccess(session.userId, params.id, params.itemId)
+  const check = await requireListAccess(session.userId, params.id)
   if ('error' in check) return NextResponse.json({ error: check.error }, { status: check.status })
+
+  const item = await findItem(params.id, params.itemId)
+  if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   await prisma.listItem.delete({ where: { id: params.itemId } })
   return NextResponse.json({ data: null })
