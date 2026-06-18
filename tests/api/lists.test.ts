@@ -35,7 +35,7 @@ beforeEach(() => {
 describe('GET /api/lists', () => {
   it('returns lists for authenticated user', async () => {
     mockGetSession.mockResolvedValue(fakeSession)
-    mockList.findMany.mockResolvedValue([{ ...fakeList, _count: { items: 2 } }])
+    mockList.findMany.mockResolvedValue([{ ...fakeList, _count: { items: 2 } }] as any)
 
     await testApiHandler({
       appHandler: listsHandler,

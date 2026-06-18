@@ -840,7 +840,7 @@ git commit -m "feat: middleware — redirect unauthenticated users to /login"
   - `GET /api/lists` → `{ data: Array<List & { _count: { items: number } }> }`
   - `POST /api/lists` body `{ name: string }` → `{ data: List }` 201
   - `PATCH /api/lists/:id` body `{ name: string }` → `{ data: List }`
-  - `DELETE /api/lists/:id` → `{ data: null }` 204
+  - `DELETE /api/lists/:id` → `{ data: null }` 200
 
 - [ ] **Step 1: Write failing tests**
 

@@ -1,0 +1,13 @@
+{
+  "name": "Покупки",
+  "short_name": "Покупки",
+  "description": "Ваши личные списки покупок",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F5F0",
+  "theme_color": "#1A3A2A",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

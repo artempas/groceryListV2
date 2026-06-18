@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Список покупок — Design Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #F7F5F0;
+      --surface:   #FFFFFF;
+      --brand:     #1A3A2A;
+      --brand-mid: #2D5C43;
+      --text:      #1A1A1A;
+      --muted:     #6B6B6B;
+      --checked-text: #AFAFAF;
+      --checked-bg:   #E8F0EB;
+      --border:    #E5E2DC;
+      --danger:    #C4363A;
+      --font-display: 'Fraunces', serif;
+      --font-ui:      'Inter', system-ui, sans-serif;
+    }
+
+    body {
+      background: #D0CCC4;
+      font-family: var(--font-ui);
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px;
+      min-height: 100vh;
+      flex-wrap: wrap;
+    }
+
+    /* Phone shell */
+    .phone {
+      width: 390px;
+      background: var(--bg);
+      border-radius: 48px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.08);
+      position: relative;
+    }
+
+    .phone-label {
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    /* Status bar */
+    .status-bar {
+      background: var(--bg);
+      padding: 14px 28px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .status-bar .time {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .status-bar .icons {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .status-bar .icons svg { color: var(--text); }
+
+    /* ─── SCREEN 1: Dashboard ─── */
+    .screen { min-height: 750px; display: flex; flex-direction: column; }
+
+    .dashboard-header {
+      padding: 8px 24px 20px;
+      background: var(--bg);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .dashboard-title {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    .dashboard-subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+      font-weight: 400;
+    }
+    .btn-signout {
+      font-size: 13px;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 0;
+      font-family: var(--font-ui);
+    }
+
+    .lists-scroll {
+      flex: 1;
+      padding: 4px 16px 100px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .list-card {
+      background: var(--surface);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: box-shadow 0.15s, transform 0.1s;
+      text-decoration: none;
+      position: relative;
+    }
+    .list-card:active { transform: scale(0.98); }
+    .list-card:hover { box-shadow: 0 4px 16px rgba(26,58,42,0.10); }
+
+    .list-card-left {}
+    .list-card-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .list-card-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .list-card-arrow {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .list-card-arrow svg { color: var(--brand); }
+
+    .list-card-delete {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--border);
+      transition: color 0.15s;
+    }
+    .list-card-delete:hover { color: var(--danger); }
+
+    /* FAB */
+    .fab {
+      position: absolute;
+      bottom: 28px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 18px;
+      background: var(--brand);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(26,58,42,0.35);
+      transition: transform 0.1s;
+      color: white;
+    }
+    .fab:active { transform: scale(0.94); }
+
+    /* ─── SCREEN 2: List detail ─── */
+    .detail-header {
+      background: var(--bg);
+      padding: 8px 20px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .btn-back {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      color: var(--text);
+    }
+    .detail-header-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .items-scroll {
+      flex: 1;
+      padding: 12px 16px 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .item-row {
+      background: var(--surface);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+    .item-row.checked {
+      background: var(--checked-bg);
+      border-color: transparent;
+    }
+
+    .checkbox {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 2px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .item-row.checked .checkbox {
+      background: var(--brand);
+      border-color: var(--brand);
+    }
+
+    .item-text { flex: 1; min-width: 0; }
+    .item-name {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color 0.2s;
+    }
+    .item-row.checked .item-name {
+      color: var(--checked-text);
+      text-decoration: line-through;
+      text-decoration-color: var(--checked-text);
+    }
+    .item-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 8px 4px 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Add item input */
+    .add-item-bar {
+      padding: 12px 16px 28px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+    .add-item-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-family: var(--font-ui);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .add-item-input::placeholder { color: var(--muted); }
+    .add-item-input:focus { border-color: var(--brand); }
+
+    /* Login screen */
+    .login-screen {
+      min-height: 750px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 40px 28px;
+      gap: 0;
+    }
+    .login-brand {
+      font-family: var(--font-display);
+      font-size: 48px;
+      font-weight: 900;
+      color: var(--brand);
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .login-tagline {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 48px;
+    }
+    .form-field { margin-bottom: 12px; }
+    .form-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-family: var(--font-ui);
+      color: var(--text);
+      outline: none;
+    }
+    .form-input::placeholder { color: var(--muted); }
+    .btn-primary {
+      width: 100%;
+      background: var(--brand);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 15px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: var(--font-ui);
+      cursor: pointer;
+      margin-top: 8px;
+      letter-spacing: 0.01em;
+    }
+    .login-footer {
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 20px;
+    }
+    .login-footer a { color: var(--brand); text-decoration: none; font-weight: 500; }
+
+    /* Swipe hint overlay for list detail */
+    .swipe-hint {
+      position: absolute;
+      inset: 0;
+      background: var(--danger);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 16px;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .item-row-wrap { position: relative; }
+    .item-row-wrap:hover .swipe-hint { opacity: 0; }
+
+    /* Captions below phones */
+    .screen-wrap { display: flex; flex-direction: column; gap: 12px; }
+  </style>
+</head>
+<body>
+
+  <!-- Screen 1: Login -->
+  <div class="screen-wrap">
+    <div class="phone-label">Вход</div>
+    <div class="phone">
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="4.5" y="2" width="3" height="10" rx="1"/><rect x="9" y="0" width="3" height="12" rx="1"/><rect x="13.5" y="0" width="2.5" height="12" rx="1" opacity=".3"/></svg>
+          <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3.5 C3.5 1 11.5 1 14 3.5" opacity=".3"/><path d="M2.5 5.5 C4.5 3.5 10.5 3.5 12.5 5.5"/><path d="M4.5 7.5 C6 6 9 6 10.5 7.5"/><circle cx="7.5" cy="9.5" r="1" fill="currentColor" stroke="none"/></svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="21" height="10" rx="3" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="1.5" y="2.5" width="14" height="7" rx="2"/><rect x="22" y="4" width="3" height="4" rx="1"/></svg>
+        </span>
+      </div>
+      <div class="login-screen">
+        <div class="login-brand">Покупки</div>
+        <div class="login-tagline">Ваши списки всегда под рукой.</div>
+        <div class="form-field">
+          <input class="form-input" type="email" placeholder="Email" value="artem@example.com">
+        </div>
+        <div class="form-field">
+          <input class="form-input" type="password" placeholder="Пароль" value="••••••••">
+        </div>
+        <button class="btn-primary">Войти</button>
+        <div class="login-footer">Нет аккаунта? <a href="#">Зарегистрироваться</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 2: Dashboard -->
+  <div class="screen-wrap">
+    <div class="phone-label">Мои списки</div>
+    <div class="phone">
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="4.5" y="2" width="3" height="10" rx="1"/><rect x="9" y="0" width="3" height="12" rx="1"/><rect x="13.5" y="0" width="2.5" height="12" rx="1" opacity=".3"/></svg>
+          <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3.5 C3.5 1 11.5 1 14 3.5" opacity=".3"/><path d="M2.5 5.5 C4.5 3.5 10.5 3.5 12.5 5.5"/><path d="M4.5 7.5 C6 6 9 6 10.5 7.5"/><circle cx="7.5" cy="9.5" r="1" fill="currentColor" stroke="none"/></svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="21" height="10" rx="3" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="1.5" y="2.5" width="14" height="7" rx="2"/><rect x="22" y="4" width="3" height="4" rx="1"/></svg>
+        </span>
+      </div>
+      <div class="screen">
+        <div class="dashboard-header">
+          <div>
+            <div class="dashboard-title">Мои списки</div>
+            <div class="dashboard-subtitle">3 списка</div>
+          </div>
+          <button class="btn-signout">Выйти</button>
+        </div>
+
+        <div class="lists-scroll">
+          <div class="list-card">
+            <div class="list-card-left">
+              <div class="list-card-name">Продукты на неделю</div>
+              <div class="list-card-meta">12 позиций · 3 куплено</div>
+            </div>
+            <div class="list-card-arrow">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
+            </div>
+          </div>
+
+          <div class="list-card">
+            <div class="list-card-left">
+              <div class="list-card-name">День рождения</div>
+              <div class="list-card-meta">8 позиций · 0 куплено</div>
+            </div>
+            <div class="list-card-arrow">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
+            </div>
+          </div>
+
+          <div class="list-card">
+            <div class="list-card-left">
+              <div class="list-card-name">Аптека</div>
+              <div class="list-card-meta">2 позиции · 2 куплено</div>
+            </div>
+            <div class="list-card-arrow">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <button class="fab">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 3: List detail -->
+  <div class="screen-wrap">
+    <div class="phone-label">Список покупок</div>
+    <div class="phone">
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="4.5" y="2" width="3" height="10" rx="1"/><rect x="9" y="0" width="3" height="12" rx="1"/><rect x="13.5" y="0" width="2.5" height="12" rx="1" opacity=".3"/></svg>
+          <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3.5 C3.5 1 11.5 1 14 3.5" opacity=".3"/><path d="M2.5 5.5 C4.5 3.5 10.5 3.5 12.5 5.5"/><path d="M4.5 7.5 C6 6 9 6 10.5 7.5"/><circle cx="7.5" cy="9.5" r="1" fill="currentColor" stroke="none"/></svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="21" height="10" rx="3" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="1.5" y="2.5" width="14" height="7" rx="2"/><rect x="22" y="4" width="3" height="4" rx="1"/></svg>
+        </span>
+      </div>
+      <div class="screen" style="display:flex;flex-direction:column;">
+        <div class="detail-header">
+          <button class="btn-back">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 3L5 8l5 5"/></svg>
+          </button>
+          <div class="detail-header-title">Продукты на неделю</div>
+        </div>
+
+        <div class="items-scroll">
+          <!-- Unchecked items -->
+          <div class="item-row-wrap">
+            <div class="item-row" onclick="this.classList.toggle('checked')">
+              <div class="checkbox">
+                <svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M1 5l3.5 3.5L11 1"/></svg>
+              </div>
+              <div class="item-text">
+                <div class="item-name">Молоко цельное, 2л</div>
+                <div class="item-meta">Добавил Артём · только что</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="item-row-wrap">
+            <div class="item-row" onclick="this.classList.toggle('checked')">
+              <div class="checkbox"></div>
+              <div class="item-text">
+                <div class="item-name">Хлеб на закваске</div>
+                <div class="item-meta">Добавил Артём · 2 мин назад</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="item-row-wrap">
+            <div class="item-row" onclick="this.classList.toggle('checked')">
+              <div class="checkbox"></div>
+              <div class="item-text">
+                <div class="item-name">Греческий йогурт</div>
+                <div class="item-meta">Добавил Артём · 5 мин назад</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="item-row-wrap">
+            <div class="item-row" onclick="this.classList.toggle('checked')">
+              <div class="checkbox"></div>
+              <div class="item-text">
+                <div class="item-name">Помидоры, 1 кг</div>
+                <div class="item-meta">Добавил Артём · 5 мин назад</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-label">Куплено (3)</div>
+
+          <div class="item-row-wrap">
+            <div class="item-row checked" onclick="this.classList.toggle('checked')">
+              <div class="checkbox">
+                <svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 5l3.5 3.5L11 1"/></svg>
+              </div>
+              <div class="item-text">
+                <div class="item-name">Яйца, 12 шт</div>
+                <div class="item-meta">Купил Артём · 8 мин назад</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="item-row-wrap">
+            <div class="item-row checked" onclick="this.classList.toggle('checked')">
+              <div class="checkbox">
+                <svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 5l3.5 3.5L11 1"/></svg>
+              </div>
+              <div class="item-text">
+                <div class="item-name">Масло сливочное</div>
+                <div class="item-meta">Купил Артём · 10 мин назад</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="item-row-wrap">
+            <div class="item-row checked" onclick="this.classList.toggle('checked')">
+              <div class="checkbox">
+                <svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 5l3.5 3.5L11 1"/></svg>
+              </div>
+              <div class="item-text">
+                <div class="item-name">Оливковое масло</div>
+                <div class="item-meta">Купил Артём · 15 мин назад</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="add-item-bar">
+          <input class="add-item-input" type="text" placeholder="Добавить товар…">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Toggle checkbox SVG visibility when item is checked/unchecked
+    document.querySelectorAll('.item-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const svg = row.querySelector('.checkbox svg');
+        if (svg) svg.style.display = row.classList.contains('checked') ? 'block' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>
