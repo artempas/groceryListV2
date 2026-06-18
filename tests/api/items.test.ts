@@ -37,6 +37,7 @@ const item = {
   id: 'item-1', name: 'Milk', listId: 'list-1',
   createdById: 'user-1', createdAt: new Date(),
   checkedAt: null, checkedById: null,
+  category: null,
 }
 
 beforeEach(() => {
