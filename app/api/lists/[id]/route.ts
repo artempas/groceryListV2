@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
-import { requireListAccess, requireListOwner } from '@/lib/access'
+import { requireListOwner } from '@/lib/access'
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
