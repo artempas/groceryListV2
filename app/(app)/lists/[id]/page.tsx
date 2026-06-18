@@ -3,12 +3,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
+import { groupItemsByCategory } from '@/lib/group-items'
+import { CATEGORY_NAMES } from '@/lib/categories'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ListItem {
   id: string
   name: string
+  category: string | null
   listId: string
   createdAt: string
   checkedAt: string | null
@@ -464,6 +467,7 @@ export default function ListDetailPage() {
   // ── Split items ───────────────────────────────────────────────────────────
 
   const unchecked = items?.filter((i) => i.checkedAt === null) ?? []
+  const uncheckedGroups = groupItemsByCategory(unchecked, CATEGORY_NAMES)
   const checked = items?.filter((i) => i.checkedAt !== null) ?? []
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -515,18 +519,25 @@ export default function ListDetailPage() {
 
         {!isLoading && !isError && items !== undefined && (
           <>
-            {/* Unchecked items */}
-            {unchecked.map((item) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                onToggle={handleToggle}
-                onDelete={handleDelete}
-                isToggling={
-                  toggleMutation.isPending &&
-                  (toggleMutation.variables as { itemId: string } | undefined)?.itemId === item.id
-                }
-              />
+            {/* Unchecked items grouped by category */}
+            {uncheckedGroups.map((group) => (
+              <div key={group.category ?? '__none__'} className="space-y-2">
+                <p className="text-[11px] font-semibold text-muted uppercase tracking-wide px-1 py-2">
+                  {group.category ?? 'Без категории'}
+                </p>
+                {group.items.map((item) => (
+                  <ItemRow
+                    key={item.id}
+                    item={item}
+                    onToggle={handleToggle}
+                    onDelete={handleDelete}
+                    isToggling={
+                      toggleMutation.isPending &&
+                      (toggleMutation.variables as { itemId: string } | undefined)?.itemId === item.id
+                    }
+                  />
+                ))}
+              </div>
             ))}
 
             {/* "Куплено (N)" divider — only shown when there are checked items */}
