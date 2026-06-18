@@ -21,11 +21,15 @@ jest.mock('@/lib/auth', () => ({
   getSession: jest.fn(),
 }))
 
+jest.mock('@/lib/categorize', () => ({ categorize: jest.fn() }))
+
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { categorize } from '@/lib/categorize'
 const mockGetSession = getSession as jest.Mock
 const mockList = prisma.list as jest.Mocked<typeof prisma.list>
 const mockItem = prisma.listItem as jest.Mocked<typeof prisma.listItem>
+const mockCategorize = categorize as jest.Mock
 
 const session = { userId: 'user-1', email: 'a@b.com' }
 const list = { id: 'list-1', name: 'G', ownerId: 'user-1', createdAt: new Date() }
@@ -62,6 +66,7 @@ describe('GET /api/lists/:id/items', () => {
 
 describe('POST /api/lists/:id/items', () => {
   it('creates an item', async () => {
+    mockCategorize.mockResolvedValue(null)
     mockItem.create.mockResolvedValue(item)
 
     await testApiHandler({
@@ -76,6 +81,54 @@ describe('POST /api/lists/:id/items', () => {
         expect(res.status).toBe(201)
         const body = await res.json()
         expect(body.data.name).toBe('Milk')
+      },
+    })
+  })
+
+  it('saves the category returned by categorize', async () => {
+    mockCategorize.mockResolvedValue('Молочное и яйца')
+    mockItem.create.mockResolvedValue({ ...item, category: 'Молочное и яйца' })
+
+    await testApiHandler({
+      appHandler: itemsHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        const res = await fetch({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Milk' }),
+        })
+        expect(res.status).toBe(201)
+        const body = await res.json()
+        expect(body.data.category).toBe('Молочное и яйца')
+        expect(mockItem.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ category: 'Молочное и яйца' }),
+          }),
+        )
+      },
+    })
+  })
+
+  it('still creates the item when categorize rejects', async () => {
+    mockCategorize.mockRejectedValue(new Error('boom'))
+    mockItem.create.mockResolvedValue({ ...item, category: null })
+
+    await testApiHandler({
+      appHandler: itemsHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        const res = await fetch({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Milk' }),
+        })
+        expect(res.status).toBe(201)
+        expect(mockItem.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ category: null }),
+          }),
+        )
       },
     })
   })
