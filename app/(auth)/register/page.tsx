@@ -3,11 +3,7 @@
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-
-function sanitizeNext(value: string | null): string {
-  if (!value) return '/'
-  return value.startsWith('/') ? value : '/'
-}
+import { sanitizeNext } from '@/lib/sanitize-next'
 
 export default function RegisterPageWrapper() {
   return (

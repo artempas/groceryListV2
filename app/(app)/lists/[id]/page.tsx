@@ -707,7 +707,7 @@ function ShareSheet({ listId, onClose }: { listId: string; onClose: () => void }
   const qc = useQueryClient()
   const [copied, setCopied] = useState(false)
 
-  const { data: invite, isLoading: inviteLoading } = useQuery({
+  const { data: invite, isLoading: inviteLoading, isError: inviteError } = useQuery({
     queryKey: ['invite', listId],
     queryFn: () => createInvite(listId),
     staleTime: Infinity,
@@ -765,7 +765,9 @@ function ShareSheet({ listId, onClose }: { listId: string; onClose: () => void }
           <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-2">
             Ссылка
           </p>
-          {inviteLoading ? (
+          {inviteError ? (
+            <p className="text-sm text-danger">Не удалось получить ссылку. Попробуйте закрыть и открыть шторку.</p>
+          ) : inviteLoading ? (
             <div className="h-12 bg-bg rounded-xl animate-pulse" />
           ) : (
             <>
@@ -817,7 +819,7 @@ function ShareSheet({ listId, onClose }: { listId: string; onClose: () => void }
                   <button
                     type="button"
                     onClick={() => handleRemove(m)}
-                    disabled={removeMutation.isPending}
+                    disabled={removeMutation.isPending && removeMutation.variables === m.id}
                     aria-label={`Удалить ${m.name}`}
                     className="w-8 h-8 rounded-full flex items-center justify-center text-muted active:bg-border disabled:opacity-50"
                   >
