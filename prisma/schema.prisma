@@ -7,25 +7,28 @@ datasource db {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
+  id           String           @id @default(cuid())
+  email        String           @unique
   passwordHash String
   name         String
-  createdAt    DateTime   @default(now())
+  createdAt    DateTime         @default(now())
 
   lists        List[]
-  createdItems ListItem[] @relation("ItemCreatedBy")
-  checkedItems ListItem[] @relation("ItemCheckedBy")
+  createdItems ListItem[]       @relation("ItemCreatedBy")
+  checkedItems ListItem[]       @relation("ItemCheckedBy")
+  memberships  ListMembership[]
 }
 
 model List {
-  id        String     @id @default(cuid())
-  name      String
-  owner     User       @relation(fields: [ownerId], references: [id])
-  ownerId   String
-  createdAt DateTime   @default(now())
+  id          String           @id @default(cuid())
+  name        String
+  owner       User             @relation(fields: [ownerId], references: [id])
+  ownerId     String
+  createdAt   DateTime         @default(now())
 
-  items     ListItem[]
+  items       ListItem[]
+  memberships ListMembership[]
+  invite      ListInvite?
 }
 
 model ListItem {
@@ -39,4 +42,23 @@ model ListItem {
   checkedAt   DateTime?
   checkedBy   User?     @relation("ItemCheckedBy", fields: [checkedById], references: [id])
   checkedById String?
+}
+
+model ListMembership {
+  list     List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+  joinedAt DateTime @default(now())
+
+  @@id([listId, userId])
+  @@index([userId])
+}
+
+model ListInvite {
+  list      List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId    String   @id
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
