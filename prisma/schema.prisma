@@ -34,6 +34,7 @@ model List {
 model ListItem {
   id          String    @id @default(cuid())
   name        String
+  category    String?
   list        List      @relation(fields: [listId], references: [id], onDelete: Cascade)
   listId      String
   createdBy   User      @relation("ItemCreatedBy", fields: [createdById], references: [id])
