@@ -1,8 +1,8 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useRef, useState, Suspense } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { useRef, useState } from 'react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,13 +28,16 @@ function formatRelative(isoDate: string): string {
 
 // ── API fetchers ─────────────────────────────────────────────────────────────
 
+function handleAccessLost(status: number) {
+  if (status === 401) { window.location.href = '/login'; return true }
+  if (status === 403 || status === 404) { window.location.href = '/'; return true }
+  return false
+}
+
 async function fetchItems(listId: string): Promise<ListItem[]> {
   const res = await fetch(`/api/lists/${listId}/items`)
   if (!res.ok) {
-    if (res.status === 401) {
-      window.location.href = '/login'
-      return []
-    }
+    if (handleAccessLost(res.status)) return []
     const json = await res.json().catch(() => ({}))
     throw new Error(json.error ?? 'Не удалось загрузить список')
   }
@@ -49,6 +52,7 @@ async function addItem(listId: string, name: string): Promise<ListItem> {
     body: JSON.stringify({ name }),
   })
   if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
     const json = await res.json().catch(() => ({}))
     throw new Error(json.error ?? 'Не удалось добавить позицию')
   }
@@ -67,6 +71,7 @@ async function toggleItem(
     body: JSON.stringify({ checked }),
   })
   if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
     const json = await res.json().catch(() => ({}))
     throw new Error(json.error ?? 'Не удалось обновить позицию')
   }
@@ -77,6 +82,7 @@ async function toggleItem(
 async function deleteItem(listId: string, itemId: string): Promise<void> {
   const res = await fetch(`/api/lists/${listId}/items/${itemId}`, { method: 'DELETE' })
   if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
     const json = await res.json().catch(() => ({}))
     throw new Error(json.error ?? 'Не удалось удалить позицию')
   }
@@ -207,22 +213,43 @@ function SkeletonItem() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function ListDetailPageWrapper() {
-  return (
-    <Suspense>
-      <ListDetailPage />
-    </Suspense>
-  )
+interface ListMeta {
+  id: string
+  name: string
+  isOwner: boolean
+  owner: { id: string; name: string }
 }
 
-function ListDetailPage() {
+async function fetchListMeta(listId: string): Promise<ListMeta> {
+  const res = await fetch(`/api/lists/${listId}`)
+  if (!res.ok) {
+    if (res.status === 401) {
+      window.location.href = '/login'
+      throw new Error('unauthorized')
+    }
+    if (res.status === 403 || res.status === 404) {
+      window.location.href = '/'
+      throw new Error('no-access')
+    }
+    throw new Error('Не удалось загрузить список')
+  }
+  const json = await res.json()
+  return json.data
+}
+
+export default function ListDetailPage() {
   const params = useParams<{ id: string }>()
-  const searchParams = useSearchParams()
   const router = useRouter()
   const qc = useQueryClient()
 
   const listId = params.id
-  const listName = searchParams.get('name') ?? 'Список'
+
+  const { data: meta } = useQuery<ListMeta>({
+    queryKey: ['list-meta', listId],
+    queryFn: () => fetchListMeta(listId),
+  })
+
+  const listName = meta?.name ?? 'Список'
 
   const [inputValue, setInputValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
