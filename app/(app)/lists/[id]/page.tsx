@@ -30,7 +30,7 @@ function formatRelative(isoDate: string): string {
 
 function handleAccessLost(status: number) {
   if (status === 401) { window.location.href = '/login'; return true }
-  if (status === 403 || status === 404) { window.location.href = '/'; return true }
+  if (status === 403 || status === 404) { window.location.href = '/lists'; return true }
   return false
 }
 
@@ -307,7 +307,7 @@ async function fetchListMeta(listId: string): Promise<ListMeta> {
       throw new Error('unauthorized')
     }
     if (res.status === 403 || res.status === 404) {
-      window.location.href = '/'
+      window.location.href = '/lists'
       throw new Error('no-access')
     }
     throw new Error('Не удалось загрузить список')
@@ -427,7 +427,7 @@ export default function ListDetailPage() {
     mutationFn: () => deleteList(listId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lists'] })
-      router.replace('/')
+      router.replace('/lists')
     },
   })
 
@@ -438,7 +438,7 @@ export default function ListDetailPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lists'] })
-      router.replace('/')
+      router.replace('/lists')
     },
   })
 
@@ -473,7 +473,7 @@ export default function ListDetailPage() {
       {/* Header */}
       <header className="bg-bg px-4 pt-5 pb-4 flex items-center gap-3 border-b border-border flex-shrink-0">
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/lists')}
           aria-label="Назад"
           className="w-9 h-9 rounded-xl bg-surface border border-border flex items-center justify-center text-text"
         >
