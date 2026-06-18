@@ -88,6 +88,41 @@ async function deleteItem(listId: string, itemId: string): Promise<void> {
   }
 }
 
+async function renameList(listId: string, name: string): Promise<void> {
+  const res = await fetch(`/api/lists/${listId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
+    throw new Error('Не удалось переименовать')
+  }
+}
+
+async function deleteList(listId: string): Promise<void> {
+  const res = await fetch(`/api/lists/${listId}`, { method: 'DELETE' })
+  if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
+    throw new Error('Не удалось удалить')
+  }
+}
+
+async function leaveList(listId: string, userId: string): Promise<void> {
+  const res = await fetch(`/api/lists/${listId}/members/${userId}`, { method: 'DELETE' })
+  if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
+    throw new Error('Не удалось выйти')
+  }
+}
+
+async function fetchMe(): Promise<{ id: string }> {
+  const res = await fetch('/api/auth/me')
+  if (!res.ok) throw new Error('Не удалось получить пользователя')
+  const json = await res.json()
+  return json.data
+}
+
 // ── Item row with swipe-to-delete ─────────────────────────────────────────────
 
 interface ItemRowProps {
@@ -253,6 +288,10 @@ export default function ListDetailPage() {
 
   const [inputValue, setInputValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [renameOpen, setRenameOpen] = useState(false)
+
+  const { data: me } = useQuery<{ id: string }>({ queryKey: ['me'], queryFn: fetchMe })
 
   // ── Fetch items ──────────────────────────────────────────────────────────
 
@@ -328,6 +367,36 @@ export default function ListDetailPage() {
     },
   })
 
+  // ── Rename / Delete list / Leave mutations ───────────────────────────────
+
+  const renameMutation = useMutation({
+    mutationFn: (name: string) => renameList(listId, name),
+    onSuccess: (_void, name) => {
+      qc.setQueryData<ListMeta>(['list-meta', listId], (old) => (old ? { ...old, name } : old))
+      qc.invalidateQueries({ queryKey: ['lists'] })
+      setRenameOpen(false)
+    },
+  })
+
+  const deleteListMutation = useMutation({
+    mutationFn: () => deleteList(listId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lists'] })
+      router.replace('/')
+    },
+  })
+
+  const leaveMutation = useMutation({
+    mutationFn: () => {
+      if (!me) throw new Error('no user')
+      return leaveList(listId, me.id)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lists'] })
+      router.replace('/')
+    },
+  })
+
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   function handleSubmit(e: React.FormEvent) {
@@ -363,20 +432,24 @@ export default function ListDetailPage() {
           aria-label="Назад"
           className="w-9 h-9 rounded-xl bg-surface border border-border flex items-center justify-center text-text"
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
         <h1 className="font-semibold text-[17px] text-text flex-1 truncate">{listName}</h1>
+        {meta && (
+          <button
+            onClick={() => setMenuOpen(true)}
+            aria-label="Меню"
+            className="w-9 h-9 rounded-xl bg-surface border border-border flex items-center justify-center text-text"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="5" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="12" cy="19" r="1.5" />
+            </svg>
+          </button>
+        )}
       </header>
 
       {/* Scrollable items list */}
@@ -475,6 +548,159 @@ export default function ListDetailPage() {
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
+          </button>
+        </form>
+      </div>
+
+      {/* Overflow menu sheet */}
+      {menuOpen && meta && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-end justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setMenuOpen(false)
+          }}
+        >
+          <div className="bg-surface rounded-t-2xl w-full max-w-lg p-2 pb-6">
+            {meta.isOwner ? (
+              <>
+                <MenuButton
+                  label="Пригласить"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    // wired in Task 15 — open Share sheet
+                  }}
+                />
+                <MenuButton
+                  label="Переименовать"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setRenameOpen(true)
+                  }}
+                />
+                <MenuButton
+                  label="Удалить"
+                  danger
+                  onClick={() => {
+                    if (confirm(`Удалить список «${meta.name}»?`)) {
+                      setMenuOpen(false)
+                      deleteListMutation.mutate()
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <MenuButton
+                label="Выйти"
+                danger
+                onClick={() => {
+                  if (confirm(`Покинуть список «${meta.name}»?`)) {
+                    setMenuOpen(false)
+                    leaveMutation.mutate()
+                  }
+                }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => setMenuOpen(false)}
+              className="w-full text-center text-sm text-muted py-3 mt-1"
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rename sheet */}
+      {renameOpen && meta && (
+        <RenameSheet
+          initialName={meta.name}
+          isPending={renameMutation.isPending}
+          onClose={() => setRenameOpen(false)}
+          onSubmit={(name) => renameMutation.mutate(name)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Helper components ─────────────────────────────────────────────────────────
+
+function MenuButton({
+  label,
+  onClick,
+  danger = false,
+}: {
+  label: string
+  onClick: () => void
+  danger?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        danger
+          ? 'w-full text-left px-4 py-3.5 text-[15px] font-medium text-danger rounded-xl active:bg-bg'
+          : 'w-full text-left px-4 py-3.5 text-[15px] font-medium text-text rounded-xl active:bg-bg'
+      }
+    >
+      {label}
+    </button>
+  )
+}
+
+function RenameSheet({
+  initialName,
+  isPending,
+  onClose,
+  onSubmit,
+}: {
+  initialName: string
+  isPending: boolean
+  onClose: () => void
+  onSubmit: (name: string) => void
+}) {
+  const [name, setName] = useState(initialName)
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed || trimmed === initialName) return
+    onSubmit(trimmed)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-end justify-center z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="bg-surface rounded-t-2xl w-full max-w-lg p-6 pb-10">
+        <h2 className="font-display font-bold text-xl text-brand mb-5">Переименовать</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+            maxLength={100}
+            className="w-full rounded-xl border border-border px-4 py-3 text-[15px] text-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-bg"
+          />
+          <button
+            type="submit"
+            disabled={isPending || !name.trim() || name.trim() === initialName}
+            className="w-full rounded-xl bg-brand text-white font-semibold text-[15px] py-3 disabled:opacity-50 active:opacity-80 transition-opacity"
+          >
+            {isPending ? 'Сохранение…' : 'Сохранить'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full text-center text-sm text-muted py-1"
+          >
+            Отмена
           </button>
         </form>
       </div>
