@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -469,6 +470,7 @@ export default function ListDetailPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex flex-col h-screen bg-bg">
       {/* Header */}
       <header className="bg-bg px-4 pt-5 pb-4 flex items-center gap-3 border-b border-border flex-shrink-0">
@@ -674,6 +676,7 @@ export default function ListDetailPage() {
         />
       )}
     </div>
+    </MotionConfig>
   )
 }
 
