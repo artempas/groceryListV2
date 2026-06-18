@@ -1,11 +1,26 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function LoginPage() {
+function sanitizeNext(value: string | null): string {
+  if (!value) return '/'
+  return value.startsWith('/') ? value : '/'
+}
+
+export default function LoginPageWrapper() {
+  return (
+    <Suspense>
+      <LoginPage />
+    </Suspense>
+  )
+}
+
+function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = sanitizeNext(searchParams.get('next'))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -24,7 +39,7 @@ export default function LoginPage() {
       })
 
       if (res.ok) {
-        router.push('/')
+        router.replace(next)
         return
       }
 
@@ -40,6 +55,8 @@ export default function LoginPage() {
       setLoading(false)
     }
   }
+
+  const registerHref = next === '/' ? '/register' : `/register?next=${encodeURIComponent(next)}`
 
   return (
     <div className="min-h-screen flex flex-col bg-bg">
@@ -73,9 +90,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && (
-            <p className="mt-3 text-sm text-danger">{error}</p>
-          )}
+          {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
           <button
             type="submit"
@@ -88,7 +103,7 @@ export default function LoginPage() {
 
         <p className="text-center text-[13px] text-muted mt-5">
           Нет аккаунта?{' '}
-          <Link href="/register" className="text-brand font-medium">
+          <Link href={registerHref} className="text-brand font-medium">
             Зарегистрироваться
           </Link>
         </p>
