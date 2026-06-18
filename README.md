@@ -34,3 +34,20 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Категоризация товаров
+
+Товары автоматически распределяются по категориям через эмбеддинги OpenRouter.
+
+Переменные окружения:
+
+- `OPENROUTER_API_KEY` — ключ OpenRouter (обязателен для категоризации).
+- `OPENROUTER_EMBEDDING_MODEL` — модель эмбеддингов (по умолчанию `openai/text-embedding-3-small`).
+- `CATEGORY_MATCH_THRESHOLD` — минимальная косинусная близость для присвоения категории (по умолчанию `0.30`).
+
+Векторы категорий предвычислены в `lib/category-vectors.json`. Перегенерировать
+после изменения списка категорий или модели:
+
+```bash
+npx tsx scripts/build-category-embeddings.ts
+```

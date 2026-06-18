@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { requireListAccess } from '@/lib/access'
+import { categorize } from '@/lib/categorize'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
@@ -32,8 +33,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const { name } = await request.json()
   if (!name?.trim()) return NextResponse.json({ error: 'name is required' }, { status: 400 })
 
+  const trimmed = name.trim()
+  const category = await categorize(trimmed).catch(() => null)
+
   const item = await prisma.listItem.create({
-    data: { name: name.trim(), listId: params.id, createdById: session.userId },
+    data: { name: trimmed, category, listId: params.id, createdById: session.userId },
     include: {
       createdBy: { select: { id: true, name: true } },
       checkedBy: { select: { id: true, name: true } },

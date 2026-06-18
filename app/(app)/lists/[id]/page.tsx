@@ -4,12 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
+import { groupItemsByCategory } from '@/lib/group-items'
+import { CATEGORY_NAMES } from '@/lib/categories'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ListItem {
   id: string
   name: string
+  category: string | null
   listId: string
   createdAt: string
   checkedAt: string | null
@@ -472,6 +475,7 @@ export default function ListDetailPage() {
   // ── Split items ───────────────────────────────────────────────────────────
 
   const unchecked = items?.filter((i) => i.checkedAt === null) ?? []
+  const uncheckedGroups = groupItemsByCategory(unchecked, CATEGORY_NAMES)
   const checked = items?.filter((i) => i.checkedAt !== null) ?? []
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -524,19 +528,34 @@ export default function ListDetailPage() {
 
         {!isLoading && !isError && items !== undefined && (
           <AnimatePresence initial={false}>
-            {/* Unchecked items */}
-            {unchecked.map((item) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                onToggle={handleToggle}
-                onDelete={handleDelete}
-                isToggling={
-                  toggleMutation.isPending &&
-                  (toggleMutation.variables as { itemId: string } | undefined)?.itemId === item.id
-                }
-              />
-            ))}
+            {/* Unchecked items, grouped by category. Headers and rows are
+                emitted as flat, keyed siblings so each ItemRow stays a direct
+                child of AnimatePresence and keeps its layout/exit animation. */}
+            {uncheckedGroups.flatMap((group) => [
+              <motion.p
+                key={`cat-${group.category ?? '__none__'}`}
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                className="text-[11px] font-semibold text-muted uppercase tracking-wide px-1 py-2"
+              >
+                {group.category ?? 'Без категории'}
+              </motion.p>,
+              ...group.items.map((item) => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  onToggle={handleToggle}
+                  onDelete={handleDelete}
+                  isToggling={
+                    toggleMutation.isPending &&
+                    (toggleMutation.variables as { itemId: string } | undefined)?.itemId === item.id
+                  }
+                />
+              )),
+            ])}
 
             {/* "Куплено (N)" divider — only shown when there are checked items */}
             {checked.length > 0 && (
