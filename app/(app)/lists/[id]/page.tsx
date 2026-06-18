@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -213,7 +214,14 @@ function ItemRow({ item, onToggle, onDelete, isToggling }: ItemRowProps) {
     : `Добавил ${item.createdBy.name} · ${formatRelative(item.createdAt)}`
 
   return (
-    <div className="relative overflow-hidden rounded-2xl">
+    <motion.div
+      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, height: 0, marginTop: 0, paddingTop: 0, paddingBottom: 0 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+      className="relative overflow-hidden rounded-2xl"
+    >
       {/* Red delete background */}
       <div className="absolute inset-0 bg-danger rounded-2xl flex items-center justify-end pr-5 text-white text-sm font-semibold select-none">
         Удалить
@@ -272,7 +280,7 @@ function ItemRow({ item, onToggle, onDelete, isToggling }: ItemRowProps) {
           <p className="text-[11px] text-muted mt-0.5">{meta}</p>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -469,6 +477,7 @@ export default function ListDetailPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex flex-col h-screen bg-bg">
       {/* Header */}
       <header className="bg-bg px-4 pt-5 pb-4 flex items-center gap-3 border-b border-border flex-shrink-0">
@@ -514,7 +523,7 @@ export default function ListDetailPage() {
         )}
 
         {!isLoading && !isError && items !== undefined && (
-          <>
+          <AnimatePresence initial={false}>
             {/* Unchecked items */}
             {unchecked.map((item) => (
               <ItemRow
@@ -531,9 +540,17 @@ export default function ListDetailPage() {
 
             {/* "Куплено (N)" divider — only shown when there are checked items */}
             {checked.length > 0 && (
-              <p className="text-[11px] font-semibold text-muted uppercase tracking-wide px-1 py-2">
+              <motion.p
+                key="checked-divider"
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                className="text-[11px] font-semibold text-muted uppercase tracking-wide px-1 py-2"
+              >
                 Куплено ({checked.length})
-              </p>
+              </motion.p>
             )}
 
             {/* Checked items */}
@@ -558,7 +575,7 @@ export default function ListDetailPage() {
                 Добавьте первую позицию ниже.
               </p>
             )}
-          </>
+          </AnimatePresence>
         )}
       </main>
 
@@ -674,6 +691,7 @@ export default function ListDetailPage() {
         />
       )}
     </div>
+    </MotionConfig>
   )
 }
 
