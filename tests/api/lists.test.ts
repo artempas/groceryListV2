@@ -114,3 +114,62 @@ describe('DELETE /api/lists/:id', () => {
     })
   })
 })
+
+describe('GET /api/lists/:id', () => {
+  it('returns list with isOwner=true for owner', async () => {
+    mockGetSession.mockResolvedValue(fakeSession)
+    mockList.findUnique.mockResolvedValue({
+      ...fakeList,
+      owner: { id: 'user-1', name: 'Alice' },
+    } as any)
+
+    await testApiHandler({
+      appHandler: listHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        const res = await fetch({ method: 'GET' })
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        expect(body.data.isOwner).toBe(true)
+        expect(body.data.owner).toEqual({ id: 'user-1', name: 'Alice' })
+      },
+    })
+  })
+
+  it('returns isOwner=false for member', async () => {
+    mockGetSession.mockResolvedValue({ userId: 'member-1', email: 'm@x.com' })
+    mockList.findUnique.mockResolvedValue({
+      ...fakeList,
+      owner: { id: 'user-1', name: 'Alice' },
+    } as any)
+    ;(prisma.listMembership.findUnique as jest.Mock).mockResolvedValue({
+      listId: 'list-1', userId: 'member-1', joinedAt: new Date(),
+    })
+
+    await testApiHandler({
+      appHandler: listHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        const res = await fetch({ method: 'GET' })
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        expect(body.data.isOwner).toBe(false)
+      },
+    })
+  })
+
+  it('returns 403 for non-member', async () => {
+    mockGetSession.mockResolvedValue({ userId: 'stranger', email: 's@x.com' })
+    mockList.findUnique.mockResolvedValue(fakeList as any)
+    ;(prisma.listMembership.findUnique as jest.Mock).mockResolvedValue(null)
+
+    await testApiHandler({
+      appHandler: listHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        const res = await fetch({ method: 'GET' })
+        expect(res.status).toBe(403)
+      },
+    })
+  })
+})
