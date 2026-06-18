@@ -7,12 +7,29 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const lists = await prisma.list.findMany({
-    where: { ownerId: session.userId },
+    where: {
+      OR: [
+        { ownerId: session.userId },
+        { memberships: { some: { userId: session.userId } } },
+      ],
+    },
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { items: true } } },
+    include: {
+      owner: { select: { id: true, name: true } },
+      _count: { select: { items: true } },
+    },
   })
 
-  return NextResponse.json({ data: lists })
+  const data = lists.map((l) => ({
+    id: l.id,
+    name: l.name,
+    createdAt: l.createdAt,
+    owner: l.owner,
+    isOwner: l.ownerId === session.userId,
+    _count: l._count,
+  }))
+
+  return NextResponse.json({ data })
 }
 
 export async function POST(request: NextRequest) {

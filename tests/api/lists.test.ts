@@ -11,7 +11,7 @@ jest.mock('@/lib/prisma', () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
-    listMembership: { findUnique: jest.fn() },
+    listMembership: { findUnique: jest.fn(), findMany: jest.fn() },
   },
 }))
 
@@ -34,9 +34,22 @@ beforeEach(() => {
 })
 
 describe('GET /api/lists', () => {
-  it('returns lists for authenticated user', async () => {
-    mockGetSession.mockResolvedValue(fakeSession)
-    mockList.findMany.mockResolvedValue([{ ...fakeList, _count: { items: 2 } }] as any)
+  it('returns own lists with isOwner=true and shared lists with isOwner=false', async () => {
+    mockGetSession.mockResolvedValue(fakeSession) // user-1
+    mockList.findMany.mockResolvedValue([
+      {
+        id: 'list-1', name: 'Mine', ownerId: 'user-1',
+        createdAt: new Date('2026-06-18T10:00:00Z'),
+        owner: { id: 'user-1', name: 'Alice' },
+        _count: { items: 2 },
+      },
+      {
+        id: 'list-2', name: 'Shared', ownerId: 'owner-2',
+        createdAt: new Date('2026-06-18T11:00:00Z'),
+        owner: { id: 'owner-2', name: 'Bob' },
+        _count: { items: 5 },
+      },
+    ] as any)
 
     await testApiHandler({
       appHandler: listsHandler,
@@ -44,8 +57,13 @@ describe('GET /api/lists', () => {
         const res = await fetch({ method: 'GET' })
         expect(res.status).toBe(200)
         const body = await res.json()
-        expect(body.data).toHaveLength(1)
-        expect(body.data[0].name).toBe('Groceries')
+        expect(body.data).toHaveLength(2)
+        const mine = body.data.find((l: any) => l.id === 'list-1')
+        const shared = body.data.find((l: any) => l.id === 'list-2')
+        expect(mine.isOwner).toBe(true)
+        expect(mine.owner).toEqual({ id: 'user-1', name: 'Alice' })
+        expect(shared.isOwner).toBe(false)
+        expect(shared.owner).toEqual({ id: 'owner-2', name: 'Bob' })
       },
     })
   })
