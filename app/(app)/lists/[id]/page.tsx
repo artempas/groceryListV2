@@ -116,6 +116,50 @@ async function leaveList(listId: string, userId: string): Promise<void> {
   }
 }
 
+interface MemberInfo {
+  id: string
+  name: string
+  joinedAt: string
+}
+
+interface MembersResponse {
+  owner: { id: string; name: string }
+  members: MemberInfo[]
+}
+
+interface InviteInfo {
+  token: string
+  expiresAt: string
+}
+
+async function fetchMembers(listId: string): Promise<MembersResponse> {
+  const res = await fetch(`/api/lists/${listId}/members`)
+  if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
+    throw new Error('Не удалось загрузить участников')
+  }
+  const json = await res.json()
+  return json.data
+}
+
+async function createInvite(listId: string): Promise<InviteInfo> {
+  const res = await fetch(`/api/lists/${listId}/invite`, { method: 'POST' })
+  if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
+    throw new Error('Не удалось создать ссылку')
+  }
+  const json = await res.json()
+  return json.data
+}
+
+async function removeMember(listId: string, userId: string): Promise<void> {
+  const res = await fetch(`/api/lists/${listId}/members/${userId}`, { method: 'DELETE' })
+  if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
+    throw new Error('Не удалось удалить участника')
+  }
+}
+
 async function fetchMe(): Promise<{ id: string }> {
   const res = await fetch('/api/auth/me')
   if (!res.ok) throw new Error('Не удалось получить пользователя')
@@ -290,6 +334,7 @@ export default function ListDetailPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
   const { data: me } = useQuery<{ id: string }>({ queryKey: ['me'], queryFn: fetchMe })
 
@@ -567,7 +612,7 @@ export default function ListDetailPage() {
                   label="Пригласить"
                   onClick={() => {
                     setMenuOpen(false)
-                    // wired in Task 15 — open Share sheet
+                    setShareOpen(true)
                   }}
                 />
                 <MenuButton
@@ -620,6 +665,14 @@ export default function ListDetailPage() {
           onSubmit={(name) => renameMutation.mutate(name)}
         />
       )}
+
+      {/* Share sheet */}
+      {shareOpen && meta?.isOwner && (
+        <ShareSheet
+          listId={listId}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -647,6 +700,149 @@ function MenuButton({
     >
       {label}
     </button>
+  )
+}
+
+function ShareSheet({ listId, onClose }: { listId: string; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [copied, setCopied] = useState(false)
+
+  const { data: invite, isLoading: inviteLoading } = useQuery({
+    queryKey: ['invite', listId],
+    queryFn: () => createInvite(listId),
+    staleTime: Infinity,
+  })
+
+  const { data: members } = useQuery({
+    queryKey: ['members', listId],
+    queryFn: () => fetchMembers(listId),
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (userId: string) => removeMember(listId, userId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['members', listId] }),
+  })
+
+  const inviteUrl = invite ? `${window.location.origin}/invite/${invite.token}` : ''
+  const expiresText = invite
+    ? new Date(invite.expiresAt).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : ''
+
+  async function handleCopy() {
+    if (!inviteUrl) return
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback: user can manually copy from the visible input
+    }
+  }
+
+  function handleRemove(member: MemberInfo) {
+    if (confirm(`Удалить ${member.name} из списка?`)) {
+      removeMutation.mutate(member.id)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-end justify-center z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="bg-surface rounded-t-2xl w-full max-w-lg p-6 pb-10 max-h-[90vh] overflow-y-auto">
+        <h2 className="font-display font-bold text-xl text-brand mb-5">Поделиться списком</h2>
+
+        {/* Link section */}
+        <div className="mb-6">
+          <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-2">
+            Ссылка
+          </p>
+          {inviteLoading ? (
+            <div className="h-12 bg-bg rounded-xl animate-pulse" />
+          ) : (
+            <>
+              <p className="text-xs text-muted mb-2">Действует до {expiresText}</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={inviteUrl}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="flex-1 bg-bg border border-border rounded-xl px-3 py-2.5 text-[13px] text-text outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="px-4 py-2.5 rounded-xl bg-brand text-white text-sm font-semibold"
+                >
+                  {copied ? 'Скопировано' : 'Скопировать'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Members section */}
+        <div className="mb-4">
+          <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-2">
+            Участники
+          </p>
+          {members ? (
+            <div className="space-y-2">
+              <div className="flex items-center bg-bg border border-border rounded-xl px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] font-medium text-text truncate">{members.owner.name}</p>
+                  <p className="text-[11px] text-muted">владелец</p>
+                </div>
+              </div>
+              {members.members.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center bg-bg border border-border rounded-xl px-4 py-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-medium text-text truncate">{m.name}</p>
+                    <p className="text-[11px] text-muted">
+                      присоединился {new Date(m.joinedAt).toLocaleDateString('ru-RU')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(m)}
+                    disabled={removeMutation.isPending}
+                    aria-label={`Удалить ${m.name}`}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-muted active:bg-border disabled:opacity-50"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-12 bg-bg rounded-xl animate-pulse" />
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full text-center text-sm text-muted py-2"
+        >
+          Закрыть
+        </button>
+      </div>
+    </div>
   )
 }
 
