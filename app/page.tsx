@@ -10,6 +10,8 @@ interface GroceryList {
   id: string
   name: string
   createdAt: string
+  owner: { id: string; name: string }
+  isOwner: boolean
   _count: { items: number }
 }
 
@@ -53,13 +55,16 @@ async function createList(name: string): Promise<GroceryList> {
     throw new Error(json.error ?? 'Не удалось создать список')
   }
   const json = await res.json()
-  // POST returns list without _count — normalise
-  return { _count: { items: 0 }, ...json.data }
-}
-
-async function deleteList(id: string): Promise<void> {
-  const res = await fetch(`/api/lists/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Не удалось удалить список')
+  // POST returns list without owner/isOwner/_count — set sensible defaults for optimistic display
+  const data = json.data
+  return {
+    id: data.id,
+    name: data.name,
+    createdAt: data.createdAt,
+    owner: { id: data.ownerId, name: '' },
+    isOwner: true,
+    _count: { items: 0 },
+  }
 }
 
 async function logout(): Promise<void> {
@@ -168,6 +173,8 @@ export default function ListsDashboard() {
         id: `optimistic-${Date.now()}`,
         name,
         createdAt: new Date().toISOString(),
+        owner: { id: 'me', name: '' },
+        isOwner: true,
         _count: { items: 0 },
       }
       qc.setQueryData<GroceryList[]>(['lists'], (old = []) => [optimistic, ...old])
@@ -179,30 +186,11 @@ export default function ListsDashboard() {
       }
     },
     onSuccess: (newList) => {
-      // Replace the optimistic entry with the real one
       qc.setQueryData<GroceryList[]>(['lists'], (old = []) =>
         old.map((l) => (l.id.startsWith('optimistic-') ? newList : l)),
       )
       setModalOpen(false)
-      router.push(`/lists/${newList.id}?name=${encodeURIComponent(newList.name)}`)
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['lists'] })
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteList,
-    onMutate: async (id: string) => {
-      await qc.cancelQueries({ queryKey: ['lists'] })
-      const previous = qc.getQueryData<GroceryList[]>(['lists'])
-      qc.setQueryData<GroceryList[]>(['lists'], (old = []) => old.filter((l) => l.id !== id))
-      return { previous }
-    },
-    onError: (_err, _id, ctx) => {
-      if (ctx?.previous !== undefined) {
-        qc.setQueryData(['lists'], ctx.previous)
-      }
+      router.push(`/lists/${newList.id}`)
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['lists'] })
@@ -225,7 +213,6 @@ export default function ListsDashboard() {
   return (
     <>
       <div className="min-h-screen bg-bg">
-        {/* Header */}
         <header className="px-5 pt-6 pb-4 flex items-start justify-between">
           <div>
             <h1 className="font-display font-bold text-3xl text-brand tracking-tight">
@@ -244,7 +231,6 @@ export default function ListsDashboard() {
           </button>
         </header>
 
-        {/* Content */}
         <main className="px-5 pb-28">
           {isLoading && (
             <div className="space-y-3">
@@ -260,7 +246,7 @@ export default function ListsDashboard() {
 
           {!isLoading && !isError && count === 0 && (
             <p className="text-sm text-muted mt-8 text-center leading-relaxed">
-              У вас пока нет списков.{' '}Нажмите{' '}
+              У вас пока нет списков.{' '}Нажмите{' '}
               <span className="font-semibold text-brand">+</span> чтобы создать первый.
             </p>
           )}
@@ -268,19 +254,13 @@ export default function ListsDashboard() {
           {!isLoading && !isError && count > 0 && (
             <div className="space-y-3">
               {lists!.map((list) => (
-                <ListCard
-                  key={list.id}
-                  list={list}
-                  onDelete={(id) => deleteMutation.mutate(id)}
-                  isDeleting={deleteMutation.isPending && deleteMutation.variables === list.id}
-                />
+                <ListCard key={list.id} list={list} />
               ))}
             </div>
           )}
         </main>
       </div>
 
-      {/* FAB */}
       <button
         onClick={() => setModalOpen(true)}
         aria-label="Создать список"
@@ -292,7 +272,6 @@ export default function ListsDashboard() {
         </svg>
       </button>
 
-      {/* Create modal */}
       <CreateModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -305,52 +284,29 @@ export default function ListsDashboard() {
 
 // ── List card sub-component ───────────────────────────────────────────────────
 
-interface ListCardProps {
-  list: GroceryList
-  onDelete: (id: string) => void
-  isDeleting: boolean
-}
-
-function ListCard({ list, onDelete, isDeleting }: ListCardProps) {
+function ListCard({ list }: { list: GroceryList }) {
   const router = useRouter()
-  const [pressTimer, setPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
-
-  function handlePointerDown() {
-    const timer = setTimeout(() => {
-      if (confirm(`Удалить список «${list.name}»?`)) {
-        onDelete(list.id)
-      }
-    }, 600)
-    setPressTimer(timer)
-  }
-
-  function handlePointerUp() {
-    if (pressTimer) {
-      clearTimeout(pressTimer)
-      setPressTimer(null)
-    }
-  }
 
   function handleClick() {
     if (!list.id.startsWith('optimistic-')) {
-      router.push(`/lists/${list.id}?name=${encodeURIComponent(list.name)}`)
+      router.push(`/lists/${list.id}`)
     }
   }
+
+  const subtitle = list.isOwner
+    ? pluralItems(list._count.items)
+    : `общий · от ${list.owner.name} · ${pluralItems(list._count.items)}`
 
   return (
     <button
       onClick={handleClick}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-      disabled={isDeleting || list.id.startsWith('optimistic-')}
+      disabled={list.id.startsWith('optimistic-')}
       className="w-full bg-surface rounded-2xl border border-border px-4 py-4 flex items-center gap-3 active:scale-[0.98] transition-transform disabled:opacity-60 text-left"
     >
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-[15px] text-text truncate">{list.name}</p>
-        <p className="text-xs text-muted mt-0.5">{pluralItems(list._count.items)}</p>
+        <p className="text-xs text-muted mt-0.5 truncate">{subtitle}</p>
       </div>
-      {/* Chevron */}
       <svg
         className="text-muted shrink-0"
         width="16"
