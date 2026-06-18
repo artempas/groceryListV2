@@ -1,5 +1,4 @@
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import categoryVectorsData from '@/lib/category-vectors.json'
 import { embed } from '@/lib/embeddings'
 
 export interface CategoryVector {
@@ -22,18 +21,9 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(magA) * Math.sqrt(magB))
 }
 
-let cached: CategoryVector[] | null = null
-
 /** Loads precomputed category vectors; returns [] if the file is missing/invalid. */
 export function getCategoryVectors(): CategoryVector[] {
-  if (cached) return cached
-  try {
-    const raw = readFileSync(join(process.cwd(), 'lib', 'category-vectors.json'), 'utf8')
-    cached = JSON.parse(raw) as CategoryVector[]
-  } catch {
-    cached = []
-  }
-  return cached
+  return categoryVectorsData as unknown as CategoryVector[]
 }
 
 export function pickCategory(
@@ -44,6 +34,7 @@ export function pickCategory(
   let best: string | null = null
   let bestScore = -Infinity
   for (const cat of categories) {
+    if (cat.vector.length !== itemVector.length) continue
     const score = cosineSimilarity(itemVector, cat.vector)
     if (score > bestScore) {
       bestScore = score
@@ -62,11 +53,14 @@ export async function categorize(
   loadVectors: () => CategoryVector[] = getCategoryVectors,
 ): Promise<string | null> {
   try {
-    const threshold = process.env.CATEGORY_MATCH_THRESHOLD
+    const vectors = loadVectors()
+    if (vectors.length === 0) return null
+    const parsed = process.env.CATEGORY_MATCH_THRESHOLD
       ? parseFloat(process.env.CATEGORY_MATCH_THRESHOLD)
       : DEFAULT_THRESHOLD
+    const threshold = Number.isFinite(parsed) ? parsed : DEFAULT_THRESHOLD
     const vector = await embed(name)
-    return pickCategory(vector, loadVectors(), threshold)
+    return pickCategory(vector, vectors, threshold)
   } catch {
     return null
   }
