@@ -20,24 +20,37 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   let unsubscribe: () => void = () => {}
   let heartbeat: ReturnType<typeof setInterval>
+  let closed = false
 
   const cleanup = () => {
+    if (closed) return
+    closed = true
     unsubscribe()
     clearInterval(heartbeat)
+    request.signal.removeEventListener('abort', cleanup)
   }
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
+      const safeEnqueue = (chunk: Uint8Array) => {
+        if (closed) return
+        try {
+          controller.enqueue(chunk)
+        } catch {
+          cleanup()
+        }
+      }
+
       const send = (event: ListEvent) => {
         // Don't echo an event back to the tab that caused it; it already applied it optimistically.
         if (clientId && event.originClientId === clientId) return
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+        safeEnqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
       }
       unsubscribe = subscribeListEvents(params.id, send)
       // Send an initial comment to flush HTTP headers so the client's fetch() resolves immediately.
-      controller.enqueue(encoder.encode(`:\n\n`))
+      safeEnqueue(encoder.encode(`:\n\n`))
       heartbeat = setInterval(() => {
-        controller.enqueue(encoder.encode(`:\n\n`))
+        safeEnqueue(encoder.encode(`:\n\n`))
       }, HEARTBEAT_MS)
     },
     cancel() {

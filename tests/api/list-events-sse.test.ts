@@ -115,3 +115,28 @@ it('skips an event originating from the same clientId', async () => {
     },
   })
 })
+
+it('does not throw and delivers nothing when an event is emitted after disconnect', async () => {
+  await testApiHandler({
+    appHandler: sseHandler,
+    url: '/api/lists/list-1/events?clientId=reader-tab',
+    params: { id: 'list-1' },
+    async test({ fetch }) {
+      const res = await fetch({ method: 'GET' })
+      const reader = res.body!.getReader()
+      // Cancel the reader to simulate client disconnect — triggers stream cancel() → cleanup().
+      await reader.cancel()
+      // Emitting after disconnect must not throw (send is unsubscribed by cleanup).
+      expect(() =>
+        emitListEvent('list-1', {
+          type: 'item.added', listId: 'list-1', originClientId: 'other-tab',
+          payload: {
+            id: 'post-disconnect', name: 'Ghost', category: null, listId: 'list-1',
+            createdAt: new Date('2026-06-19T00:00:00.000Z'), checkedAt: null,
+            createdBy: { id: 'user-1', name: 'A' }, checkedBy: null,
+          },
+        })
+      ).not.toThrow()
+    },
+  })
+})
