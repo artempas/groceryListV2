@@ -277,7 +277,9 @@ describe('list event emission', () => {
     })
 
     expect(mockEmit).toHaveBeenCalledWith('list-1', expect.objectContaining({
-      type: 'item.updated', originClientId: 'tab-1',
+      type: 'item.updated',
+      originClientId: 'tab-1',
+      payload: expect.objectContaining({ id: 'item-1', checkedAt: expect.any(Date) }),
     }))
   })
 
