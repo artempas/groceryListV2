@@ -13,7 +13,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
   const items = await prisma.listItem.findMany({
     where: { listId: params.id },
-    orderBy: [{ checkedAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'desc' }],
+    orderBy: [{ checkedAt: { sort: 'desc', nulls: 'first' } }, { createdAt: 'desc' }],
     include: {
       createdBy: { select: { id: true, name: true } },
       checkedBy: { select: { id: true, name: true } },
