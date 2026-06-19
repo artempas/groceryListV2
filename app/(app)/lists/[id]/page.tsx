@@ -18,6 +18,7 @@ interface ListItem {
   checkedAt: string | null
   createdBy: { id: string; name: string }
   checkedBy: { id: string; name: string } | null
+  pending?: boolean
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ async function removeMember(listId: string, userId: string): Promise<void> {
   }
 }
 
-async function fetchMe(): Promise<{ id: string }> {
+async function fetchMe(): Promise<{ id: string; name: string }> {
   const res = await fetch('/api/auth/me')
   if (!res.ok) throw new Error('Не удалось получить пользователя')
   const json = await res.json()
@@ -182,17 +183,20 @@ interface ItemRowProps {
 
 function ItemRow({ item, onToggle, onDelete, isToggling }: ItemRowProps) {
   const isChecked = item.checkedAt !== null
+  const pending = item.pending === true
   const [offset, setOffset] = useState(0)
   const [transitioning, setTransitioning] = useState(false)
   const startX = useRef<number | null>(null)
   const currentOffset = useRef(0)
 
   function handleTouchStart(e: React.TouchEvent) {
+    if (pending) return
     startX.current = e.touches[0].clientX
     setTransitioning(false)
   }
 
   function handleTouchMove(e: React.TouchEvent) {
+    if (pending) return
     if (startX.current === null) return
     const dx = e.touches[0].clientX - startX.current
     if (dx < 0) {
@@ -203,6 +207,7 @@ function ItemRow({ item, onToggle, onDelete, isToggling }: ItemRowProps) {
   }
 
   function handleTouchEnd() {
+    if (pending) return
     setTransitioning(true)
     if (currentOffset.current < -100) {
       onDelete(item.id)
@@ -248,7 +253,7 @@ function ItemRow({ item, onToggle, onDelete, isToggling }: ItemRowProps) {
         {/* Checkbox */}
         <button
           onClick={() => onToggle(item)}
-          disabled={isToggling}
+          disabled={isToggling || pending}
           aria-label={isChecked ? 'Снять отметку' : 'Отметить купленным'}
           className="flex-shrink-0 disabled:opacity-60"
         >
@@ -280,7 +285,14 @@ function ItemRow({ item, onToggle, onDelete, isToggling }: ItemRowProps) {
           >
             {item.name}
           </p>
-          <p className="text-[11px] text-muted mt-0.5">{meta}</p>
+          {pending ? (
+            <p className="text-[11px] text-muted mt-0.5 flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full border-2 border-border border-t-brand animate-spin inline-block" />
+              Определяем категорию…
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted mt-0.5">{meta}</p>
+          )}
         </div>
       </div>
     </motion.div>
@@ -347,7 +359,7 @@ export default function ListDetailPage() {
   const [renameOpen, setRenameOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
 
-  const { data: me } = useQuery<{ id: string }>({ queryKey: ['me'], queryFn: fetchMe })
+  const { data: me } = useQuery<{ id: string; name: string }>({ queryKey: ['me'], queryFn: fetchMe })
 
   // ── Fetch items ──────────────────────────────────────────────────────────
 
@@ -360,12 +372,29 @@ export default function ListDetailPage() {
 
   const addMutation = useMutation({
     mutationFn: (name: string) => addItem(listId, name),
-    onSuccess: (newItem) => {
-      qc.setQueryData<ListItem[]>(['items', listId], (old = []) => [newItem, ...old])
-      qc.invalidateQueries({ queryKey: ['lists'] })
+    onMutate: async (name: string) => {
+      await qc.cancelQueries({ queryKey: ['items', listId] })
+      const previous = qc.getQueryData<ListItem[]>(['items', listId])
+      const tempId = `temp-${crypto.randomUUID()}`
+      const optimistic: ListItem = {
+        id: tempId,
+        name,
+        category: null,
+        listId,
+        createdAt: new Date().toISOString(),
+        checkedAt: null,
+        createdBy: { id: me?.id ?? '', name: me?.name ?? 'Вы' },
+        checkedBy: null,
+        pending: true,
+      }
+      qc.setQueryData<ListItem[]>(['items', listId], (old = []) => [optimistic, ...old])
+      return { previous, tempId }
     },
-    onError: () => {
-      qc.invalidateQueries({ queryKey: ['items', listId] })
+    onSuccess: (newItem, _name, ctx) => {
+      qc.setQueryData<ListItem[]>(['items', listId], (old = []) =>
+        old.map((item) => (item.id === ctx?.tempId ? newItem : item)),
+      )
+      qc.invalidateQueries({ queryKey: ['lists'] })
     },
   })
 
@@ -612,7 +641,7 @@ export default function ListDetailPage() {
           />
           <button
             type="submit"
-            disabled={!inputValue.trim() || addMutation.isPending}
+            disabled={!inputValue.trim()}
             aria-label="Добавить"
             className="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-white disabled:opacity-50 flex-shrink-0"
           >
