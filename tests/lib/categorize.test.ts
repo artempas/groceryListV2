@@ -46,6 +46,13 @@ describe('categorize', () => {
     await expect(categorize('thing', () => vectors)).resolves.toBe('A')
   })
 
+  it('embeds the item name as an instructed query', async () => {
+    mockEmbed.mockResolvedValue([1, 0])
+    await categorize('thing', () => vectors)
+    expect(mockEmbed).toHaveBeenCalledWith('thing', expect.any(String))
+    expect(mockEmbed.mock.calls[0][1]).toBeTruthy()
+  })
+
   it('returns null when embed throws (API error)', async () => {
     mockEmbed.mockRejectedValue(new Error('network'))
     await expect(categorize('thing', () => vectors)).resolves.toBeNull()

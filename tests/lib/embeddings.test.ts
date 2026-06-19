@@ -31,6 +31,19 @@ describe('embed', () => {
     expect(body.input).toBe('молоко')
   })
 
+  it('wraps the input in the Qwen3 query template when an instruction is given', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ embedding: [1] }] }),
+    })
+    global.fetch = mockFetch as unknown as typeof fetch
+
+    await embed('клубника', 'Find the grocery department')
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect(body.input).toBe('Instruct: Find the grocery department\nQuery:клубника')
+  })
+
   it('uses OPENROUTER_EMBEDDING_MODEL when set', async () => {
     process.env.OPENROUTER_EMBEDDING_MODEL = 'cohere/embed-v3'
     const mockFetch = jest.fn().mockResolvedValue({

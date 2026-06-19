@@ -8,6 +8,13 @@ export interface CategoryVector {
 
 const DEFAULT_THRESHOLD = 0.3
 
+/**
+ * Query instruction for instruction-aware embedding models. The category
+ * reference vectors are stored as plain documents, so the item being
+ * classified must be embedded as a matching query — see {@link embed}.
+ */
+const QUERY_INSTRUCTION = 'Determine which grocery store department a product belongs to'
+
 export function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0
   let magA = 0
@@ -59,7 +66,7 @@ export async function categorize(
       ? parseFloat(process.env.CATEGORY_MATCH_THRESHOLD)
       : DEFAULT_THRESHOLD
     const threshold = Number.isFinite(parsed) ? parsed : DEFAULT_THRESHOLD
-    const vector = await embed(name)
+    const vector = await embed(name, QUERY_INSTRUCTION)
     return pickCategory(vector, vectors, threshold)
   } catch {
     return null
