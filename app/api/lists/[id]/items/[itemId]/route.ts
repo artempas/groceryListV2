@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { requireListAccess } from '@/lib/access'
+import { emitListEvent } from '@/lib/list-events'
 
 async function findItem(listId: string, itemId: string) {
   const item = await prisma.listItem.findUnique({ where: { id: itemId } })
@@ -35,11 +36,18 @@ export async function PATCH(
     },
   })
 
+  emitListEvent(params.id, {
+    type: 'item.updated',
+    listId: params.id,
+    originClientId: request.headers.get('x-client-id'),
+    payload: updated,
+  })
+
   return NextResponse.json({ data: updated })
 }
 
 export async function DELETE(
-  _: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string; itemId: string } },
 ) {
   const session = await getSession()
@@ -52,5 +60,13 @@ export async function DELETE(
   if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   await prisma.listItem.delete({ where: { id: params.itemId } })
+
+  emitListEvent(params.id, {
+    type: 'item.deleted',
+    listId: params.id,
+    originClientId: request.headers.get('x-client-id'),
+    payload: { id: params.itemId },
+  })
+
   return NextResponse.json({ data: null })
 }

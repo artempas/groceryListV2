@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { requireListAccess } from '@/lib/access'
 import { categorize } from '@/lib/categorize'
+import { emitListEvent } from '@/lib/list-events'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
@@ -42,6 +43,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       createdBy: { select: { id: true, name: true } },
       checkedBy: { select: { id: true, name: true } },
     },
+  })
+
+  emitListEvent(params.id, {
+    type: 'item.added',
+    listId: params.id,
+    originClientId: request.headers.get('x-client-id'),
+    payload: item,
   })
 
   return NextResponse.json({ data: item }, { status: 201 })
