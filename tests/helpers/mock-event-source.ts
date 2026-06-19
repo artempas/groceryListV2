@@ -4,7 +4,13 @@ export class MockEventSource {
     MockEventSource.instances = []
   }
 
+  // Mirror the real EventSource readyState constants.
+  static readonly CONNECTING = 0
+  static readonly OPEN = 1
+  static readonly CLOSED = 2
+
   url: string
+  readyState: number = MockEventSource.CONNECTING
   onmessage: ((e: { data: string }) => void) | null = null
   onopen: (() => void) | null = null
   onerror: (() => void) | null = null
@@ -17,5 +23,6 @@ export class MockEventSource {
 
   close() {
     this.closed = true
+    this.readyState = MockEventSource.CLOSED
   }
 }

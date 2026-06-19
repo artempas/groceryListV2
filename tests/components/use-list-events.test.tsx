@@ -98,3 +98,61 @@ test('clientId is stable and no second EventSource opens on re-render', () => {
   expect(clientIdAfter).toBe(clientIdBefore)
   expect(MockEventSource.instances.length).toBe(1)
 })
+
+function renderForReconnect() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  )
+  return renderHook(() => useListEvents('list-1'), { wrapper })
+}
+
+test('reconnects after the connection closes permanently', () => {
+  jest.useFakeTimers()
+  try {
+    renderForReconnect()
+    const es1 = MockEventSource.instances[0]
+    es1.readyState = MockEventSource.CLOSED // browser gave up (fatal error)
+    act(() => es1.onerror!())
+    act(() => {
+      jest.advanceTimersByTime(30000)
+    })
+    expect(MockEventSource.instances.length).toBe(2)
+    expect(MockEventSource.instances[1].url).toBe(es1.url) // same list + clientId
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('does not open a new EventSource while the browser is auto-retrying', () => {
+  jest.useFakeTimers()
+  try {
+    renderForReconnect()
+    const es1 = MockEventSource.instances[0]
+    es1.readyState = MockEventSource.CONNECTING // native reconnect in progress
+    act(() => es1.onerror!())
+    act(() => {
+      jest.advanceTimersByTime(30000)
+    })
+    expect(MockEventSource.instances.length).toBe(1)
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('does not reconnect after unmount', () => {
+  jest.useFakeTimers()
+  try {
+    const { unmount } = renderForReconnect()
+    const es1 = MockEventSource.instances[0]
+    es1.readyState = MockEventSource.CLOSED
+    act(() => es1.onerror!())
+    unmount()
+    act(() => {
+      jest.advanceTimersByTime(30000)
+    })
+    expect(MockEventSource.instances.length).toBe(1)
+  } finally {
+    jest.useRealTimers()
+  }
+})
