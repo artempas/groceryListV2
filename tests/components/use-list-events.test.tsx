@@ -85,3 +85,16 @@ test('closes the EventSource on unmount', () => {
   unmount()
   expect(es.closed).toBe(true)
 })
+
+test('clientId is stable and no second EventSource opens on re-render', () => {
+  const qc = new QueryClient()
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  )
+  const { result, rerender } = renderHook(() => useListEvents('list-1'), { wrapper })
+  const clientIdBefore = result.current
+  rerender()
+  const clientIdAfter = result.current
+  expect(clientIdAfter).toBe(clientIdBefore)
+  expect(MockEventSource.instances.length).toBe(1)
+})
