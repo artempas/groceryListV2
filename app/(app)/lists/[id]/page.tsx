@@ -396,6 +396,12 @@ export default function ListDetailPage() {
       )
       qc.invalidateQueries({ queryKey: ['lists'] })
     },
+    onError: (_err, name, ctx) => {
+      if (ctx?.previous !== undefined) {
+        qc.setQueryData(['items', listId], ctx.previous)
+      }
+      setInputValue((current) => (current.trim() === '' ? name : current))
+    },
   })
 
   // ── Toggle mutation (optimistic) ─────────────────────────────────────────

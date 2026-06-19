@@ -96,3 +96,25 @@ test('item appears instantly with a categorizing indicator, then reconciles', as
   )
   expect(screen.getByText('Молоко')).toBeInTheDocument()
 })
+
+test('failed add removes the optimistic row and restores the input text', async () => {
+  const user = userEvent.setup()
+  renderPage()
+
+  const input = await screen.findByPlaceholderText('Добавить позицию…')
+  await user.type(input, 'Молоко')
+  await user.click(screen.getByLabelText('Добавить'))
+
+  expect(await screen.findByText('Молоко')).toBeInTheDocument()
+
+  // Server rejects the POST (500).
+  postDeferred.resolve({
+    ok: false,
+    status: 500,
+    json: async () => ({ error: 'boom' }),
+  })
+
+  // Optimistic row is rolled back and the text is restored to the input.
+  await waitFor(() => expect(screen.queryByText('Молоко')).not.toBeInTheDocument())
+  expect(input).toHaveValue('Молоко')
+})
