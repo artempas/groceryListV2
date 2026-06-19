@@ -22,10 +22,13 @@ jest.mock('@/lib/auth', () => ({
 }))
 
 jest.mock('@/lib/categorize', () => ({ categorize: jest.fn() }))
+jest.mock('@/lib/list-events', () => ({ emitListEvent: jest.fn() }))
 
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { categorize } from '@/lib/categorize'
+import { emitListEvent } from '@/lib/list-events'
+const mockEmit = emitListEvent as jest.Mock
 const mockGetSession = getSession as jest.Mock
 const mockList = prisma.list as jest.Mocked<typeof prisma.list>
 const mockItem = prisma.listItem as jest.Mocked<typeof prisma.listItem>
@@ -230,5 +233,87 @@ describe('GET /api/lists/:id/items as member', () => {
         expect(res.status).toBe(403)
       },
     })
+  })
+})
+
+describe('list event emission', () => {
+  it('emits item.added with the originClientId header after POST', async () => {
+    mockCategorize.mockResolvedValue(null)
+    mockItem.create.mockResolvedValue(item)
+
+    await testApiHandler({
+      appHandler: itemsHandler,
+      params: { id: 'list-1' },
+      async test({ fetch }) {
+        await fetch({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-client-id': 'tab-1' },
+          body: JSON.stringify({ name: 'Milk' }),
+        })
+      },
+    })
+
+    expect(mockEmit).toHaveBeenCalledWith('list-1', expect.objectContaining({
+      type: 'item.added',
+      originClientId: 'tab-1',
+      payload: expect.objectContaining({ id: 'item-1' }),
+    }))
+  })
+
+  it('emits item.updated after PATCH', async () => {
+    mockItem.findUnique.mockResolvedValue(item)
+    mockItem.update.mockResolvedValue({ ...item, checkedAt: new Date(), checkedById: 'user-1' })
+
+    await testApiHandler({
+      appHandler: itemHandler,
+      params: { id: 'list-1', itemId: 'item-1' },
+      async test({ fetch }) {
+        await fetch({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'x-client-id': 'tab-1' },
+          body: JSON.stringify({ checked: true }),
+        })
+      },
+    })
+
+    expect(mockEmit).toHaveBeenCalledWith('list-1', expect.objectContaining({
+      type: 'item.updated',
+      originClientId: 'tab-1',
+      payload: expect.objectContaining({ id: 'item-1', checkedAt: expect.any(Date) }),
+    }))
+  })
+
+  it('emits item.deleted after DELETE', async () => {
+    mockItem.findUnique.mockResolvedValue(item)
+    mockItem.delete.mockResolvedValue(item)
+
+    await testApiHandler({
+      appHandler: itemHandler,
+      params: { id: 'list-1', itemId: 'item-1' },
+      async test({ fetch }) {
+        await fetch({ method: 'DELETE', headers: { 'x-client-id': 'tab-1' } })
+      },
+    })
+
+    expect(mockEmit).toHaveBeenCalledWith('list-1', expect.objectContaining({
+      type: 'item.deleted', originClientId: 'tab-1', payload: { id: 'item-1' },
+    }))
+  })
+
+  it('emits with originClientId null when header is absent', async () => {
+    mockItem.findUnique.mockResolvedValue(item)
+    mockItem.delete.mockResolvedValue(item)
+
+    await testApiHandler({
+      appHandler: itemHandler,
+      params: { id: 'list-1', itemId: 'item-1' },
+      async test({ fetch }) {
+        await fetch({ method: 'DELETE' })
+      },
+    })
+
+    expect(mockEmit).toHaveBeenCalledWith('list-1', expect.objectContaining({
+      originClientId: null,
+    }))
   })
 })

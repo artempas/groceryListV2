@@ -6,6 +6,7 @@ import { useRef, useState } from 'react'
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 import { groupItemsByCategory } from '@/lib/group-items'
 import { CATEGORY_NAMES } from '@/lib/categories'
+import { useListEvents } from './use-list-events'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,10 +51,10 @@ async function fetchItems(listId: string): Promise<ListItem[]> {
   return json.data
 }
 
-async function addItem(listId: string, name: string): Promise<ListItem> {
+async function addItem(listId: string, name: string, clientId: string): Promise<ListItem> {
   const res = await fetch(`/api/lists/${listId}/items`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-client-id': clientId },
     body: JSON.stringify({ name }),
   })
   if (!res.ok) {
@@ -69,10 +70,11 @@ async function toggleItem(
   listId: string,
   itemId: string,
   checked: boolean,
+  clientId: string,
 ): Promise<ListItem> {
   const res = await fetch(`/api/lists/${listId}/items/${itemId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-client-id': clientId },
     body: JSON.stringify({ checked }),
   })
   if (!res.ok) {
@@ -84,8 +86,11 @@ async function toggleItem(
   return json.data
 }
 
-async function deleteItem(listId: string, itemId: string): Promise<void> {
-  const res = await fetch(`/api/lists/${listId}/items/${itemId}`, { method: 'DELETE' })
+async function deleteItem(listId: string, itemId: string, clientId: string): Promise<void> {
+  const res = await fetch(`/api/lists/${listId}/items/${itemId}`, {
+    method: 'DELETE',
+    headers: { 'x-client-id': clientId },
+  })
   if (!res.ok) {
     if (handleAccessLost(res.status)) throw new Error('lost')
     const json = await res.json().catch(() => ({}))
@@ -345,6 +350,7 @@ export default function ListDetailPage() {
   const qc = useQueryClient()
 
   const listId = params.id
+  const clientId = useListEvents(listId)
 
   const { data: meta } = useQuery<ListMeta>({
     queryKey: ['list-meta', listId],
@@ -371,7 +377,7 @@ export default function ListDetailPage() {
   // ── Add item mutation ────────────────────────────────────────────────────
 
   const addMutation = useMutation({
-    mutationFn: (name: string) => addItem(listId, name),
+    mutationFn: (name: string) => addItem(listId, name, clientId),
     onMutate: async (name: string) => {
       await qc.cancelQueries({ queryKey: ['items', listId] })
       const previous = qc.getQueryData<ListItem[]>(['items', listId])
@@ -408,7 +414,7 @@ export default function ListDetailPage() {
 
   const toggleMutation = useMutation({
     mutationFn: ({ itemId, checked }: { itemId: string; checked: boolean }) =>
-      toggleItem(listId, itemId, checked),
+      toggleItem(listId, itemId, checked, clientId),
     onMutate: async ({ itemId, checked }) => {
       await qc.cancelQueries({ queryKey: ['items', listId] })
       const previous = qc.getQueryData<ListItem[]>(['items', listId])
@@ -438,7 +444,7 @@ export default function ListDetailPage() {
   // ── Delete mutation (optimistic) ─────────────────────────────────────────
 
   const deleteMutation = useMutation({
-    mutationFn: (itemId: string) => deleteItem(listId, itemId),
+    mutationFn: (itemId: string) => deleteItem(listId, itemId, clientId),
     onMutate: async (itemId) => {
       await qc.cancelQueries({ queryKey: ['items', listId] })
       const previous = qc.getQueryData<ListItem[]>(['items', listId])
