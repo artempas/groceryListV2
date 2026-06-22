@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import { redirect, RedirectType } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 
@@ -22,6 +22,6 @@ export default async function Home() {
     take: 2,
   })
 
-  if (lists.length === 1) redirect(`/lists/${lists[0].id}`)
+  if (lists.length === 1) redirect(`/lists/${lists[0].id}`, RedirectType.push)
   redirect('/lists')
 }
