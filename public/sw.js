@@ -1,5 +1,5 @@
-const CACHE_NAME = 'grocery-v1'
-const STATIC_ASSETS = ['/', '/login', '/register']
+const CACHE_NAME = 'grocery-v2'
+const STATIC_ASSETS = ['/login', '/register']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -18,14 +18,17 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url)
-  // Network-first for API calls
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request))
+  const { request } = event
+  const url = new URL(request.url)
+  // Navigations and API calls go straight to the network. These routes are
+  // auth-gated and the root ('/') always redirects, so a cached redirected
+  // response would break navigation requests (ERR_FAILED).
+  if (request.mode === 'navigate' || url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request))
     return
   }
-  // Cache-first for everything else
+  // Cache-first for static assets
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(request).then((cached) => cached || fetch(request))
   )
 })
