@@ -40,15 +40,26 @@ export function pickCategory(
 ): string | null {
   let best: string | null = null
   let bestScore = -Infinity
+  let skipped = 0
   for (const cat of categories) {
-    if (cat.vector.length !== itemVector.length) continue
+    if (cat.vector.length !== itemVector.length) {
+      skipped++
+      console.warn(
+        `[categorize] dimension mismatch: item vector has ${itemVector.length} dims but category "${cat.name}" has ${cat.vector.length} dims — skipping (check OPENROUTER_EMBEDDING_MODEL matches the model that built category-vectors.json)`,
+      )
+      continue
+    }
     const score = cosineSimilarity(itemVector, cat.vector)
     if (score > bestScore) {
       bestScore = score
       best = cat.name
     }
   }
-  return bestScore >= threshold ? best : null
+  const passed = bestScore >= threshold
+  console.log(
+    `[categorize] scored ${categories.length - skipped}/${categories.length} categories; best="${best}" score=${bestScore.toFixed(4)} threshold=${threshold} -> ${passed ? best : 'null (below threshold)'}`,
+  )
+  return passed ? best : null
 }
 
 /**
@@ -61,14 +72,21 @@ export async function categorize(
 ): Promise<string | null> {
   try {
     const vectors = loadVectors()
-    if (vectors.length === 0) return null
+    if (vectors.length === 0) {
+      console.warn('[categorize] no category vectors loaded — check lib/category-vectors.json')
+      return null
+    }
     const parsed = process.env.CATEGORY_MATCH_THRESHOLD
       ? parseFloat(process.env.CATEGORY_MATCH_THRESHOLD)
       : DEFAULT_THRESHOLD
     const threshold = Number.isFinite(parsed) ? parsed : DEFAULT_THRESHOLD
+    console.log(
+      `[categorize] classifying "${name}" using model=${process.env.OPENROUTER_EMBEDDING_MODEL || 'openai/text-embedding-3-small (default)'} vectors=${vectors.length} threshold=${threshold}`,
+    )
     const vector = await embed(name, QUERY_INSTRUCTION)
     return pickCategory(vector, vectors, threshold)
-  } catch {
+  } catch (err) {
+    console.error(`[categorize] failed to categorize "${name}":`, err)
     return null
   }
 }
