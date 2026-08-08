@@ -362,6 +362,7 @@ export default function ListDetailPage() {
   const [inputValue, setInputValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showAllChecked, setShowAllChecked] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
 
@@ -517,7 +518,11 @@ export default function ListDetailPage() {
 
   const unchecked = items?.filter((i) => i.checkedAt === null) ?? []
   const uncheckedGroups = groupItemsByCategory(unchecked, CATEGORY_NAMES)
-  const checked = items?.filter((i) => i.checkedAt !== null) ?? []
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const allChecked = items?.filter((i) => i.checkedAt !== null) ?? []
+  const recentChecked = allChecked.filter((i) => new Date(i.checkedAt!).getTime() >= sevenDaysAgo)
+  const olderCheckedCount = allChecked.length - recentChecked.length
+  const checked = showAllChecked ? allChecked : recentChecked
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -626,6 +631,22 @@ export default function ListDetailPage() {
                 }
               />
             ))}
+
+            {/* Toggle to reveal items checked more than 7 days ago */}
+            {olderCheckedCount > 0 && (
+              <motion.button
+                key="show-older-checked"
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                onClick={() => setShowAllChecked((v) => !v)}
+                className="w-full text-center text-[13px] font-medium text-brand px-1 py-2"
+              >
+                {showAllChecked ? 'Скрыть старые' : `Показать раньше (${olderCheckedCount})`}
+              </motion.button>
+            )}
 
             {/* Empty state */}
             {items.length === 0 && (
