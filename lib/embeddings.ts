@@ -1,4 +1,4 @@
-import { ProxyAgent } from 'undici'
+import { fetch as undiciFetch, ProxyAgent } from 'undici'
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/embeddings'
 const DEFAULT_MODEL = 'openai/text-embedding-3-small'
@@ -38,7 +38,7 @@ export async function embed(text: string, instruction?: string): Promise<number[
   const model = process.env.OPENROUTER_EMBEDDING_MODEL || DEFAULT_MODEL
   const input = instruction ? `Instruct: ${instruction}\nQuery:${text}` : text
 
-  const res = await fetch(ENDPOINT, {
+  const res = await undiciFetch(ENDPOINT, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -46,7 +46,7 @@ export async function embed(text: string, instruction?: string): Promise<number[
     },
     body: JSON.stringify({ model, input }),
     dispatcher: getDispatcher(),
-  } as RequestInit)
+  })
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '')

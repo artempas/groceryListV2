@@ -1,6 +1,14 @@
-import { embed } from '@/lib/embeddings'
+const mockFetch = jest.fn()
 
-const realFetch = global.fetch
+jest.mock('undici', () => {
+  const actual = jest.requireActual('undici')
+  return {
+    ...actual,
+    fetch: (...args: unknown[]) => mockFetch(...args),
+  }
+})
+
+import { embed } from '@/lib/embeddings'
 
 beforeEach(() => {
   process.env.OPENROUTER_API_KEY = 'test-key'
@@ -8,19 +16,15 @@ beforeEach(() => {
   delete process.env.OPENROUTER_PROXY_URL
   delete process.env.HTTPS_PROXY
   delete process.env.https_proxy
-})
-
-afterEach(() => {
-  global.fetch = realFetch
+  mockFetch.mockReset()
 })
 
 describe('embed', () => {
   it('posts to the OpenRouter embeddings endpoint and returns the vector', async () => {
-    const mockFetch = jest.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ data: [{ embedding: [0.1, 0.2, 0.3] }] }),
     })
-    global.fetch = mockFetch as unknown as typeof fetch
 
     const vector = await embed('молоко')
 
@@ -35,11 +39,10 @@ describe('embed', () => {
   })
 
   it('wraps the input in the Qwen3 query template when an instruction is given', async () => {
-    const mockFetch = jest.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ data: [{ embedding: [1] }] }),
     })
-    global.fetch = mockFetch as unknown as typeof fetch
 
     await embed('клубника', 'Find the grocery department')
 
@@ -49,11 +52,10 @@ describe('embed', () => {
 
   it('uses OPENROUTER_EMBEDDING_MODEL when set', async () => {
     process.env.OPENROUTER_EMBEDDING_MODEL = 'cohere/embed-v3'
-    const mockFetch = jest.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ data: [{ embedding: [1] }] }),
     })
-    global.fetch = mockFetch as unknown as typeof fetch
 
     await embed('x')
 
@@ -67,21 +69,20 @@ describe('embed', () => {
   })
 
   it('throws when the response is not ok', async () => {
-    global.fetch = jest.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: false,
       status: 500,
       text: async () => 'boom',
-    }) as unknown as typeof fetch
+    })
     await expect(embed('x')).rejects.toThrow()
   })
 
   it('routes the request through OPENROUTER_PROXY_URL when set', async () => {
     process.env.OPENROUTER_PROXY_URL = 'http://proxy.internal:8080'
-    const mockFetch = jest.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ data: [{ embedding: [1] }] }),
     })
-    global.fetch = mockFetch as unknown as typeof fetch
 
     await embed('x')
 
@@ -91,11 +92,10 @@ describe('embed', () => {
 
   it('falls back to HTTPS_PROXY when OPENROUTER_PROXY_URL is not set', async () => {
     process.env.HTTPS_PROXY = 'http://proxy.internal:8080'
-    const mockFetch = jest.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ data: [{ embedding: [1] }] }),
     })
-    global.fetch = mockFetch as unknown as typeof fetch
 
     await embed('x')
 
@@ -104,11 +104,10 @@ describe('embed', () => {
   })
 
   it('does not set a dispatcher when no proxy is configured', async () => {
-    const mockFetch = jest.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ data: [{ embedding: [1] }] }),
     })
-    global.fetch = mockFetch as unknown as typeof fetch
 
     await embed('x')
 
