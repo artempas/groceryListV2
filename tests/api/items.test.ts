@@ -11,6 +11,7 @@ jest.mock('@/lib/prisma', () => ({
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn(),
     },
     listMembership: { findUnique: jest.fn() },
   },
@@ -48,6 +49,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   mockGetSession.mockResolvedValue(session)
   mockList.findUnique.mockResolvedValue(list)
+  mockItem.count.mockResolvedValue(0)
 })
 
 describe('GET /api/lists/:id/items', () => {

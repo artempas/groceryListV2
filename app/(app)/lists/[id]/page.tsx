@@ -40,15 +40,20 @@ function handleAccessLost(status: number) {
   return false
 }
 
-async function fetchItems(listId: string): Promise<ListItem[]> {
-  const res = await fetch(`/api/lists/${listId}/items`)
+interface ItemsResult {
+  data: ListItem[]
+  hiddenOlderCount: number
+}
+
+async function fetchItems(listId: string, all = false): Promise<ItemsResult> {
+  const res = await fetch(`/api/lists/${listId}/items${all ? '?all=true' : ''}`)
   if (!res.ok) {
-    if (handleAccessLost(res.status)) return []
+    if (handleAccessLost(res.status)) return { data: [], hiddenOlderCount: 0 }
     const json = await res.json().catch(() => ({}))
     throw new Error(json.error ?? 'Не удалось загрузить список')
   }
   const json = await res.json()
-  return json.data
+  return { data: json.data, hiddenOlderCount: json.hiddenOlderCount ?? 0 }
 }
 
 async function addItem(listId: string, name: string, clientId: string): Promise<ListItem> {
@@ -370,9 +375,26 @@ export default function ListDetailPage() {
 
   // ── Fetch items ──────────────────────────────────────────────────────────
 
+  const [hiddenOlderCount, setHiddenOlderCount] = useState(0)
+
   const { data: items, isLoading, isError } = useQuery<ListItem[]>({
     queryKey: ['items', listId],
-    queryFn: () => fetchItems(listId),
+    queryFn: async () => {
+      const result = await fetchItems(listId)
+      setHiddenOlderCount(result.hiddenOlderCount)
+      return result.data
+    },
+  })
+
+  // Fetched on demand when the user asks to see items checked off more than
+  // 7 days ago; the default query above stays bounded for performance.
+  const { data: allCheckedItems, isFetching: allCheckedLoading } = useQuery<ListItem[]>({
+    queryKey: ['items', listId, 'all-checked'],
+    queryFn: async () => {
+      const result = await fetchItems(listId, true)
+      return result.data.filter((i) => i.checkedAt !== null)
+    },
+    enabled: showAllChecked,
   })
 
   // ── Add item mutation ────────────────────────────────────────────────────
@@ -518,11 +540,8 @@ export default function ListDetailPage() {
 
   const unchecked = items?.filter((i) => i.checkedAt === null) ?? []
   const uncheckedGroups = groupItemsByCategory(unchecked, CATEGORY_NAMES)
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-  const allChecked = items?.filter((i) => i.checkedAt !== null) ?? []
-  const recentChecked = allChecked.filter((i) => new Date(i.checkedAt!).getTime() >= sevenDaysAgo)
-  const olderCheckedCount = allChecked.length - recentChecked.length
-  const checked = showAllChecked ? allChecked : recentChecked
+  const recentChecked = items?.filter((i) => i.checkedAt !== null) ?? []
+  const checked = showAllChecked ? (allCheckedItems ?? recentChecked) : recentChecked
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -632,8 +651,8 @@ export default function ListDetailPage() {
               />
             ))}
 
-            {/* Toggle to reveal items checked more than 7 days ago */}
-            {olderCheckedCount > 0 && (
+            {/* Toggle to reveal items checked more than 7 days ago (fetched on demand) */}
+            {(hiddenOlderCount > 0 || showAllChecked) && (
               <motion.button
                 key="show-older-checked"
                 layout
@@ -642,9 +661,14 @@ export default function ListDetailPage() {
                 exit={{ opacity: 0 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                 onClick={() => setShowAllChecked((v) => !v)}
-                className="w-full text-center text-[13px] font-medium text-brand px-1 py-2"
+                disabled={allCheckedLoading}
+                className="w-full text-center text-[13px] font-medium text-brand px-1 py-2 disabled:opacity-50"
               >
-                {showAllChecked ? 'Скрыть старые' : `Показать раньше (${olderCheckedCount})`}
+                {showAllChecked
+                  ? allCheckedLoading
+                    ? 'Загрузка…'
+                    : 'Скрыть старые'
+                  : `Показать раньше (${hiddenOlderCount})`}
               </motion.button>
             )}
 
