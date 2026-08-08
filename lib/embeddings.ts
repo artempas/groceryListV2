@@ -15,6 +15,7 @@ function getDispatcher() {
   if (!proxyUrl) return undefined
 
   if (!proxyAgent || proxyAgentUrl !== proxyUrl) {
+    console.log(`[embeddings] routing OpenRouter requests via proxy ${proxyUrl.replace(/\/\/.*@/, '//***@')}`)
     proxyAgent = new ProxyAgent(proxyUrl)
     proxyAgentUrl = proxyUrl
   }
