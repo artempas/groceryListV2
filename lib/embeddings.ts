@@ -1,5 +1,25 @@
+import { ProxyAgent } from 'undici'
+
 const ENDPOINT = 'https://openrouter.ai/api/v1/embeddings'
 const DEFAULT_MODEL = 'openai/text-embedding-3-small'
+
+let proxyAgent: ProxyAgent | undefined
+let proxyAgentUrl: string | undefined
+
+/**
+ * OpenRouter is unreachable from the production network directly, so
+ * outbound requests are routed through an HTTP(S) proxy when configured.
+ */
+function getDispatcher() {
+  const proxyUrl = process.env.OPENROUTER_PROXY_URL || process.env.HTTPS_PROXY || process.env.https_proxy
+  if (!proxyUrl) return undefined
+
+  if (!proxyAgent || proxyAgentUrl !== proxyUrl) {
+    proxyAgent = new ProxyAgent(proxyUrl)
+    proxyAgentUrl = proxyUrl
+  }
+  return proxyAgent
+}
 
 /**
  * Returns the embedding vector for `text` via OpenRouter.
@@ -25,7 +45,8 @@ export async function embed(text: string, instruction?: string): Promise<number[
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ model, input }),
-  })
+    dispatcher: getDispatcher(),
+  } as RequestInit)
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '')

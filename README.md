@@ -43,6 +43,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 - `OPENROUTER_API_KEY` — ключ OpenRouter (обязателен для категоризации).
 - `OPENROUTER_EMBEDDING_MODEL` — модель эмбеддингов (по умолчанию `openai/text-embedding-3-small`).
+- `OPENROUTER_PROXY_URL` — URL HTTP(S)-прокси (`http://user:pass@host:port`), через который направляются запросы к OpenRouter. Нужен, если `openrouter.ai` недоступен напрямую из продакшн-сети. Если не задан, используется `HTTPS_PROXY`/`https_proxy`, если они установлены.
 - `CATEGORY_MATCH_THRESHOLD` — минимальная косинусная близость для присвоения категории (по умолчанию `0.30`).
 
 Векторы категорий предвычислены в `lib/category-vectors.json`. Перегенерировать

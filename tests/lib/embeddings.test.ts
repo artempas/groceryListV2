@@ -5,6 +5,9 @@ const realFetch = global.fetch
 beforeEach(() => {
   process.env.OPENROUTER_API_KEY = 'test-key'
   delete process.env.OPENROUTER_EMBEDDING_MODEL
+  delete process.env.OPENROUTER_PROXY_URL
+  delete process.env.HTTPS_PROXY
+  delete process.env.https_proxy
 })
 
 afterEach(() => {
@@ -70,5 +73,46 @@ describe('embed', () => {
       text: async () => 'boom',
     }) as unknown as typeof fetch
     await expect(embed('x')).rejects.toThrow()
+  })
+
+  it('routes the request through OPENROUTER_PROXY_URL when set', async () => {
+    process.env.OPENROUTER_PROXY_URL = 'http://proxy.internal:8080'
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ embedding: [1] }] }),
+    })
+    global.fetch = mockFetch as unknown as typeof fetch
+
+    await embed('x')
+
+    const [, init] = mockFetch.mock.calls[0]
+    expect(init.dispatcher).toBeDefined()
+  })
+
+  it('falls back to HTTPS_PROXY when OPENROUTER_PROXY_URL is not set', async () => {
+    process.env.HTTPS_PROXY = 'http://proxy.internal:8080'
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ embedding: [1] }] }),
+    })
+    global.fetch = mockFetch as unknown as typeof fetch
+
+    await embed('x')
+
+    const [, init] = mockFetch.mock.calls[0]
+    expect(init.dispatcher).toBeDefined()
+  })
+
+  it('does not set a dispatcher when no proxy is configured', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ embedding: [1] }] }),
+    })
+    global.fetch = mockFetch as unknown as typeof fetch
+
+    await embed('x')
+
+    const [, init] = mockFetch.mock.calls[0]
+    expect(init.dispatcher).toBeUndefined()
   })
 })
