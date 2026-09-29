@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { requireListAccess } from '@/lib/access'
 import { emitListEvent } from '@/lib/list-events'
+import { CATEGORY_NAMES } from '@/lib/categories'
 
 async function findItem(listId: string, itemId: string) {
   const item = await prisma.listItem.findUnique({ where: { id: itemId } })
@@ -23,13 +24,31 @@ export async function PATCH(
   const item = await findItem(params.id, params.itemId)
   if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const { checked } = await request.json()
+  const body = await request.json().catch(() => ({}))
+  const { checked, category } = body as { checked?: unknown; category?: unknown }
+
+  const data: Record<string, unknown> = {}
+  if (typeof checked === 'boolean') {
+    Object.assign(
+      data,
+      checked
+        ? { checkedAt: new Date(), checkedById: session.userId }
+        : { checkedAt: null, checkedById: null },
+    )
+  }
+  if (category !== undefined) {
+    if (category !== null && (typeof category !== 'string' || !CATEGORY_NAMES.includes(category))) {
+      return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
+    }
+    data.category = category
+  }
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+  }
 
   const updated = await prisma.listItem.update({
     where: { id: params.itemId },
-    data: checked
-      ? { checkedAt: new Date(), checkedById: session.userId }
-      : { checkedAt: null, checkedById: null },
+    data,
     include: {
       createdBy: { select: { id: true, name: true } },
       checkedBy: { select: { id: true, name: true } },

@@ -183,6 +183,45 @@ describe('PATCH /api/lists/:id/items/:itemId — toggle check', () => {
   })
 })
 
+describe('PATCH /api/lists/:id/items/:itemId — change category', () => {
+  async function patch(body: unknown) {
+    let status = 0
+    await testApiHandler({
+      appHandler: itemHandler,
+      params: { id: 'list-1', itemId: 'item-1' },
+      async test({ fetch }) {
+        const res = await fetch({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        status = res.status
+      },
+    })
+    return status
+  }
+
+  it('updates the category without touching checked state', async () => {
+    mockItem.findUnique.mockResolvedValue(item)
+    mockItem.update.mockResolvedValue({ ...item, category: 'Напитки' })
+    expect(await patch({ category: 'Напитки' })).toBe(200)
+    expect(mockItem.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { category: 'Напитки' } }),
+    )
+  })
+
+  it('allows clearing the category', async () => {
+    mockItem.findUnique.mockResolvedValue(item)
+    mockItem.update.mockResolvedValue({ ...item, category: null })
+    expect(await patch({ category: null })).toBe(200)
+  })
+
+  it('rejects unknown categories', async () => {
+    mockItem.findUnique.mockResolvedValue(item)
+    expect(await patch({ category: 'Nope' })).toBe(400)
+  })
+})
+
 describe('DELETE /api/lists/:id/items/:itemId', () => {
   it('deletes an item', async () => {
     mockItem.findUnique.mockResolvedValue(item)
