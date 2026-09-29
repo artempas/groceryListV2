@@ -91,6 +91,26 @@ async function toggleItem(
   return json.data
 }
 
+async function changeCategory(
+  listId: string,
+  itemId: string,
+  category: string | null,
+  clientId: string,
+): Promise<ListItem> {
+  const res = await fetch(`/api/lists/${listId}/items/${itemId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'x-client-id': clientId },
+    body: JSON.stringify({ category }),
+  })
+  if (!res.ok) {
+    if (handleAccessLost(res.status)) throw new Error('lost')
+    const json = await res.json().catch(() => ({}))
+    throw new Error(json.error ?? 'Не удалось сменить категорию')
+  }
+  const json = await res.json()
+  return json.data
+}
+
 async function deleteItem(listId: string, itemId: string, clientId: string): Promise<void> {
   const res = await fetch(`/api/lists/${listId}/items/${itemId}`, {
     method: 'DELETE',
@@ -188,10 +208,11 @@ interface ItemRowProps {
   item: ListItem
   onToggle: (item: ListItem) => void
   onDelete: (itemId: string) => void
+  onEditCategory: (item: ListItem) => void
   isToggling: boolean
 }
 
-function ItemRow({ item, onToggle, onDelete, isToggling }: ItemRowProps) {
+function ItemRow({ item, onToggle, onDelete, onEditCategory, isToggling }: ItemRowProps) {
   const isChecked = item.checkedAt !== null
   const pending = item.pending === true
   const [offset, setOffset] = useState(0)
@@ -285,7 +306,12 @@ function ItemRow({ item, onToggle, onDelete, isToggling }: ItemRowProps) {
         </button>
 
         {/* Text content */}
-        <div className="flex-1 min-w-0">
+        <div
+          className="flex-1 min-w-0"
+          onClick={() => {
+            if (!pending) onEditCategory(item)
+          }}
+        >
           <p
             className={
               isChecked
@@ -370,6 +396,7 @@ export default function ListDetailPage() {
   const [showAllChecked, setShowAllChecked] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [categoryItem, setCategoryItem] = useState<ListItem | null>(null)
 
   const { data: me } = useQuery<{ id: string; name: string }>({ queryKey: ['me'], queryFn: fetchMe })
 
@@ -451,6 +478,29 @@ export default function ListDetailPage() {
               }
             : item,
         ),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous !== undefined) {
+        qc.setQueryData(['items', listId], ctx.previous)
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['items', listId] })
+    },
+  })
+
+  // ── Change category mutation (optimistic) ────────────────────────────────
+
+  const categoryMutation = useMutation({
+    mutationFn: ({ itemId, category }: { itemId: string; category: string | null }) =>
+      changeCategory(listId, itemId, category, clientId),
+    onMutate: async ({ itemId, category }) => {
+      await qc.cancelQueries({ queryKey: ['items', listId] })
+      const previous = qc.getQueryData<ListItem[]>(['items', listId])
+      qc.setQueryData<ListItem[]>(['items', listId], (old = []) =>
+        old.map((item) => (item.id === itemId ? { ...item, category } : item)),
       )
       return { previous }
     },
@@ -614,6 +664,7 @@ export default function ListDetailPage() {
                   item={item}
                   onToggle={handleToggle}
                   onDelete={handleDelete}
+                  onEditCategory={setCategoryItem}
                   isToggling={
                     toggleMutation.isPending &&
                     (toggleMutation.variables as { itemId: string } | undefined)?.itemId === item.id
@@ -644,6 +695,7 @@ export default function ListDetailPage() {
                 item={item}
                 onToggle={handleToggle}
                 onDelete={handleDelete}
+                onEditCategory={setCategoryItem}
                 isToggling={
                   toggleMutation.isPending &&
                   (toggleMutation.variables as { itemId: string } | undefined)?.itemId === item.id
@@ -776,6 +828,21 @@ export default function ListDetailPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Category sheet */}
+      {categoryItem && (
+        <CategorySheet
+          itemName={categoryItem.name}
+          current={categoryItem.category}
+          onClose={() => setCategoryItem(null)}
+          onSelect={(category) => {
+            if (category !== categoryItem.category) {
+              categoryMutation.mutate({ itemId: categoryItem.id, category })
+            }
+            setCategoryItem(null)
+          }}
+        />
       )}
 
       {/* Rename sheet */}
@@ -965,6 +1032,55 @@ function ShareSheet({ listId, onClose }: { listId: string; onClose: () => void }
           className="w-full text-center text-sm text-muted py-2"
         >
           Закрыть
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CategorySheet({
+  itemName,
+  current,
+  onClose,
+  onSelect,
+}: {
+  itemName: string
+  current: string | null
+  onClose: () => void
+  onSelect: (category: string | null) => void
+}) {
+  const options: (string | null)[] = [...CATEGORY_NAMES, null]
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-end justify-center z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="bg-surface rounded-t-2xl w-full max-w-lg p-2 pb-6 max-h-[90vh] overflow-y-auto">
+        <h2 className="font-display font-bold text-lg text-brand px-4 pt-4 pb-2 truncate">
+          Категория: {itemName}
+        </h2>
+        {options.map((name) => (
+          <button
+            key={name ?? '__none__'}
+            type="button"
+            onClick={() => onSelect(name)}
+            className={
+              name === current
+                ? 'w-full text-left px-4 py-3.5 text-[15px] font-semibold text-brand rounded-xl active:bg-bg'
+                : 'w-full text-left px-4 py-3.5 text-[15px] font-medium text-text rounded-xl active:bg-bg'
+            }
+          >
+            {name ?? 'Без категории'}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full text-center text-sm text-muted py-3 mt-1"
+        >
+          Отмена
         </button>
       </div>
     </div>
