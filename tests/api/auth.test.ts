@@ -121,6 +121,24 @@ describe('POST /api/auth/login', () => {
       },
     })
   })
+
+  it('returns 401 for an SSO-only account without a password', async () => {
+    ;(mockPrisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'u1', email: 'a@b.com', name: 'Test', createdAt: new Date(), passwordHash: null,
+    })
+
+    await testApiHandler({
+      appHandler: loginHandler,
+      async test({ fetch }) {
+        const res = await fetch({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'a@b.com', password: 'anything' }),
+        })
+        expect(res.status).toBe(401)
+      },
+    })
+  })
 })
 
 describe('GET /api/auth/me', () => {

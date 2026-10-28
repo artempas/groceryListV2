@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
   }
 
   const user = await prisma.user.findUnique({ where: { email } })
-  if (!user) {
+  // SSO-only accounts have no password and can't log in this way.
+  if (!user?.passwordHash) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 

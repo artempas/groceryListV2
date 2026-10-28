@@ -52,3 +52,41 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 ```bash
 npx tsx scripts/build-category-embeddings.ts
 ```
+
+## Вход через SSO (OpenID Connect / Authentik)
+
+Помимо входа по паролю можно включить вход через любой OIDC-провайдер. На
+странице входа появится кнопка «Войти через …».
+
+Настройка в Authentik:
+
+1. **Applications → Providers → Create → OAuth2/OpenID Provider**.
+   - Client type: **Confidential**.
+   - Redirect URIs: `https://<ваш-домен>/api/auth/oidc/callback` (strict).
+   - Signing Key: любой сертификат (например, `authentik Self-signed Certificate`).
+     Без ключа токены подписываются client secret (HS256) — это тоже поддерживается.
+   - Scopes: `openid`, `email`, `profile` (по умолчанию).
+2. **Applications → Create**, привяжите к нему провайдер. Slug приложения
+   входит в issuer URL. Кто может входить — настраивается политиками/группами
+   на приложении в Authentik.
+3. Задайте переменные окружения:
+
+- `APP_URL` — публичный адрес приложения (`https://grocery.example.com`), из него
+  строится redirect URI. Если не задан, используется origin запроса, что за
+  reverse-proxy может оказаться внутренним адресом.
+- `OIDC_ISSUER` — OpenID Configuration Issuer из провайдера,
+  например `https://auth.example.com/application/o/grocery/`.
+- `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` — из провайдера.
+- `OIDC_PROVIDER_NAME` — подпись на кнопке (по умолчанию `SSO`).
+- `OIDC_SCOPES` — запрашиваемые scopes (по умолчанию `openid email profile`).
+- `OIDC_TRUST_EMAIL` — `true`, чтобы считать email от провайдера подтверждённым,
+  даже если `email_verified` не равен `true`.
+
+Как сопоставляются аккаунты:
+
+- при первом входе через SSO создаётся новый пользователь без пароля;
+- если уже есть аккаунт с тем же email, он привязывается к SSO-идентичности,
+  только если провайдер вернул `email_verified: true` (или задан
+  `OIDC_TRUST_EMAIL=true`). Иначе вход отклоняется — войдите по паролю;
+- дальнейшие входы идут по `sub` провайдера, так что смена email в Authentik
+  не ломает вход.
